@@ -29,7 +29,7 @@ export default function ProfessionalsListPage() {
     fetchElements();
   }, []);
 
-  if (loading) return <div className="p-6 text-slate-400 text-sm animate-pulse">A carregar profissionais...</div>;
+  //if (loading) return <div className="p-6 text-slate-400 text-sm animate-pulse">A carregar profissionais...</div>;
   if (error) return <div className="p-6 text-rose-500 text-sm font-semibold">{error}</div>;
 
   return (
