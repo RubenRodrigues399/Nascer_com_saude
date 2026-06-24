@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { validateBI } from '@/utils/validators';
-import { generateAssentoPDF } from '@/utils/pdfGenerator';
 import { logAction } from '@/utils/audit';
 import { useAuth } from '@/context/AuthContext';
 import { newbornService } from '@/app/services/recem-nascidos';
@@ -15,21 +14,40 @@ export default function CreateRecemNascidoPage() {
   const { user } = useAuth();
   
   const [step, setStep] = useState(1);
-  const [successMessage, setSuccessMessage] = useState('');
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [maxDateStr, setMaxDateStr] = useState('');
+
+  // 1. Estados locais para garantir que a UI atualiza quando os dados carregarem
+  const [listaProvincias, setListaProvincias] = useState<any[]>([]);
+  const [listaMunicipios, setListaMunicipios] = useState<any[]>([]);
+  const [listaMaternidades, setListaMaternidades] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     nomeMae: '', biMae: '', nomePai: '', biPai: '', nomeCrianca: '',
-    dataNascimento: '', horaNascimento: '', sexo: '', naturalDe: '',
+    dataNascimento: '', horaNascimento: '', sexo: '',
+    unityId: '', 
     municipioId: '', provinciaId: ''  
   });
 
-  const provinces = useLiveQuery(() => db.provinces.orderBy('name').toArray()) || [];
-  const municipalities = useLiveQuery(() => db.municipalities.orderBy('name').toArray()) || [];
-  const municipiosDisponiveis = municipalities.filter(m => m.provinceId === Number(formData.provinciaId));
+  // 2. Consultas ao Dexie (Tentando mapear os nomes padrão: provinces, municipalities, unities)
+  const dbProvinces = useLiveQuery(() => db.provinces?.orderBy('name').toArray());
+  const dbMunicipalities = useLiveQuery(() => db.municipalities?.orderBy('name').toArray());
+  // Se a tua tabela se chamar 'maternidades' ou 'hospitals', altera o nome abaixo:
+  const dbUnities = useLiveQuery(() => db.unities?.orderBy('name').toArray() || db.hospitals?.orderBy('name').toArray());
+
+  // 3. Efeito para alimentar os estados assim que o IndexedDB responder
+  useEffect(() => {
+    if (dbProvinces) setListaProvincias(dbProvinces);
+    if (dbMunicipalities) setListaMunicipios(dbMunicipalities);
+    if (dbUnities) setListaMaternidades(dbUnities);
+  }, [dbProvinces, dbMunicipalities, dbUnities]);
+
+  // Filtra os municípios com base na província selecionada
+  const municipiosDisponiveis = listaMunicipios.filter(
+    m => Number(m.provinceId) === Number(formData.provinciaId)
+  );
 
   useEffect(() => {
     const hoje = new Date();
@@ -40,7 +58,10 @@ export default function CreateRecemNascidoPage() {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setErrors(prev => ({ ...prev, [name]: '' }));
-    if (name === 'provinciaId') setFormData(prev => ({ ...prev, provinciaId: value, municipioId: '' }));
+    
+    if (name === 'provinciaId') {
+      setFormData(prev => ({ ...prev, provinciaId: value, municipioId: '' }));
+    }
   };
 
   const handleAvançarPasso1 = () => {
@@ -57,6 +78,7 @@ export default function CreateRecemNascidoPage() {
 
   const handleAvançarPasso3 = () => {
     if (formData.nomeCrianca.trim().split(' ').length < 2) return setErrors({ nomeCrianca: "Introduza o nome completo da criança." });
+    if (!formData.unityId) return setErrors({ unityId: "Selecione a Maternidade / Unidade Sanitária." });
     if (!formData.provinciaId || !formData.municipioId) return setErrors({ municipioId: "Campos territoriais obrigatórios." });
     setStep(4);
   };
@@ -66,9 +88,9 @@ export default function CreateRecemNascidoPage() {
     setLoading(true);
     setServerError('');
 
-    const provObj = provinces.find(p => p.id === Number(formData.provinciaId));
-    const muniObj = municipalities.find(m => m.id === Number(formData.municipioId));
+    const muniObj = listaMunicipios.find(m => m.id === Number(formData.municipioId));
 
+    // Montando a árvore estrutural exatamente como a API exige (Swagger)
     const payload = {
       individualChild: {
         fullName: formData.nomeCrianca.trim(),
@@ -78,7 +100,8 @@ export default function CreateRecemNascidoPage() {
       },
       height: 50, weight: 3.2, vitalStatus: "ALIVE",
       gestacionalAge: { weeks: 39, days: 0 },
-      placeOfBirth: "HOSPITAL", professionalSupport: true, unityId: 1,
+      placeOfBirth: "HOSPITAL", professionalSupport: true, 
+      unityId: Number(formData.unityId),
       mother: {
         fullName: formData.nomeMae.trim(), phoneNumber: "244900000000",
         identificationDocument: { type: "BI", number: formData.biMae.toUpperCase().trim(), expirationDate: "2034-12-31T00:00:00" },
@@ -92,16 +115,19 @@ export default function CreateRecemNascidoPage() {
       witness: []
     };
 
-    let apiSuccess = false;
     try {
       const apiResponse = await newbornService.createChild(payload);
-      if (apiResponse.success) apiSuccess = true;
-      else setServerError(apiResponse.message);
-    } catch (err) { console.warn(err); }
-
-    if (apiSuccess) {
-      router.push('/dashboard/recem-nascidos'); // Retorna direto para a lista limpa! 🎉
-    } else {
+      if (apiResponse.success) {
+        if (logAction) {
+          await logAction('Registo de Nascimento', `Criou o recém-nascido: ${formData.nomeCrianca}`, user?.fullName);
+        }
+        router.push('/dashboard/recem-nascidos');
+      } else {
+        setServerError(apiResponse.message || 'Erro de validação no servidor central.');
+        setLoading(false);
+      }
+    } catch (err) { 
+      setServerError('Servidor indisponível no momento.');
       setLoading(false);
     }
   };
@@ -112,9 +138,8 @@ export default function CreateRecemNascidoPage() {
       
       <h2 className="text-xl font-black text-slate-800 mb-4">Novo Assento de Nascimento</h2>
       
-      {serverError && <div className="mb-4 p-3 bg-rose-50 text-rose-800 text-xs rounded-lg border-l-4 border-rose-500 font-semibold">{serverError}</div>}
+      {serverError && <div className="mb-4 p-3 bg-rose-50 text-rose-800 text-xs rounded-lg border-l-4 border-rose-500 font-semibold break-words">{serverError}</div>}
 
-      {/* OS PASSOS VISUAIS EXATOS DO TEU ANTIGO WIZARD */}
       <div className="flex items-center justify-between mb-8 text-xs font-bold text-slate-400 uppercase select-none">
         <span className={step === 1 ? 'text-blue-600' : ''}>1. Mãe</span><span>➔</span>
         <span className={step === 2 ? 'text-blue-600' : ''}>2. Pai</span><span>➔</span>
@@ -127,12 +152,12 @@ export default function CreateRecemNascidoPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo da Mãe</label>
-              <input type="text" name="nomeMae" required value={formData.nomeMae} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg text-slate-800" />
+              <input type="text" name="nomeMae" required value={formData.nomeMae} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               {errors.nomeMae && <p className="text-rose-600 text-xs mt-1">{errors.nomeMae}</p>}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nº do Bilhete da Mãe</label>
-              <input type="text" name="biMae" required value={formData.biMae} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg uppercase text-slate-800" maxLength={14} />
+              <input type="text" name="biMae" required value={formData.biMae} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg uppercase text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" maxLength={14} />
               {errors.biMae && <p className="text-rose-600 text-xs mt-1">{errors.biMae}</p>}
             </div>
             <button type="button" onClick={handleAvançarPasso1} className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-bold">Continuar ➔</button>
@@ -159,31 +184,43 @@ export default function CreateRecemNascidoPage() {
         {step === 3 && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Recém-Naccido</label>
-              <input type="text" name="nomeCrianca" required value={formData.nomeCrianca} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg text-slate-800" />
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Recém-Nascido</label>
+              <input type="text" name="nomeCrianca" required value={formData.nomeCrianca} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <input type="date" name="dataNascimento" required max={maxDateStr} value={formData.dataNascimento} onChange={handleInputChange} className="px-4 py-2 border rounded-lg text-slate-800" />
-              <input type="time" name="horaNascimento" required value={formData.horaNascimento} onChange={handleInputChange} className="px-4 py-2 border rounded-lg text-slate-800" />
+              <input type="date" name="dataNascimento" required max={maxDateStr} value={formData.dataNascimento} onChange={handleInputChange} className="px-4 py-2 border rounded-lg text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              <input type="time" name="horaNascimento" required value={formData.horaNascimento} onChange={handleInputChange} className="px-4 py-2 border rounded-lg text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <select name="sexo" required value={formData.sexo} onChange={handleInputChange} className="border p-2 rounded-lg bg-white text-slate-800">
+              <select name="sexo" required value={formData.sexo} onChange={handleInputChange} className="border p-2 rounded-lg bg-white text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 <option value="">Género...</option>
                 <option value="M">Masculino</option>
                 <option value="F">Feminino</option>
               </select>
-              <input type="text" name="naturalDe" placeholder="Maternidade..." required value={formData.naturalDe} onChange={handleInputChange} className="col-span-2 px-4 py-2 border rounded-lg text-slate-800" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <select name="provinciaId" required value={formData.provinciaId} onChange={handleInputChange} className="border p-2 rounded-lg bg-white text-slate-800">
-                <option value="">Província...</option>
-                {provinces.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              
+              {/* SELECT DE MATERNIDADES */}
+              <select name="unityId" required value={formData.unityId} onChange={handleInputChange} className="col-span-2 border p-2 rounded-lg bg-white text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="">Selecione a Maternidade...</option>
+                {listaMaternidades.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
               </select>
-              <select name="municipioId" required value={formData.municipioId} disabled={!formData.provinciaId} onChange={handleInputChange} className="border p-2 rounded-lg bg-white text-slate-800">
+            </div>
+            {errors.unityId && <p className="text-rose-600 text-xs font-medium">{errors.unityId}</p>}
+
+            {/* PROVÍNCIAS E MUNICÍPIOS */}
+            <div className="grid grid-cols-2 gap-4">
+              <select name="provinciaId" required value={formData.provinciaId} onChange={handleInputChange} className="border p-2 rounded-lg bg-white text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="">Província...</option>
+                {listaProvincias.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select name="municipioId" required value={formData.municipioId} disabled={!formData.provinciaId} onChange={handleInputChange} className="border p-2 rounded-lg bg-white text-slate-800 text-sm disabled:bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 <option value="">Município...</option>
                 {municipiosDisponiveis.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
+            {errors.municipioId && <p className="text-rose-600 text-xs font-medium">{errors.municipioId}</p>}
+
             <div className="flex gap-4">
               <button type="button" onClick={() => setStep(2)} className="w-1/3 bg-slate-100 py-2.5 rounded-lg text-slate-700">Voltar</button>
               <button type="button" onClick={handleAvançarPasso3} className="w-2/3 bg-blue-600 text-white py-2.5 rounded-lg font-bold">Rever Dados ➔</button>
@@ -193,14 +230,15 @@ export default function CreateRecemNascidoPage() {
 
         {step === 4 && (
           <div className="space-y-4">
-            <div className="bg-slate-50 p-4 rounded-xl text-sm space-y-1.5 text-slate-700 border">
-              <p><strong>Criança:</strong> {formData.nomeCrianca}</p>
+            <div className="bg-slate-50 p-4 rounded-xl text-sm space-y-1.5 text-slate-700 border shadow-inner">
+              <p><strong>Criança:</strong> {formData.nomeCrianca} ({formData.sexo === 'M' ? 'Masculino' : 'Feminino'})</p>
               <p><strong>Mãe:</strong> {formData.nomeMae}</p>
               <p><strong>Pai:</strong> {formData.nomePai || 'Não Declarado'}</p>
+              <p><strong>Maternidade:</strong> {listaMaternidades.find(u => u.id === Number(formData.unityId))?.name || 'Não Selecionada'}</p>
             </div>
             <div className="flex gap-4">
               <button type="button" disabled={loading} onClick={() => setStep(3)} className="w-1/3 bg-slate-100 py-2.5 rounded-lg text-slate-700">Corrigir</button>
-              <button type="submit" disabled={loading} className="w-2/3 bg-emerald-600 text-white py-2.5 rounded-lg font-bold">
+              <button type="submit" disabled={loading} className="w-2/3 bg-emerald-600 text-white py-2.5 rounded-lg font-bold shadow-sm disabled:bg-slate-300">
                 {loading ? 'A Gravar na API...' : 'Confirmar e Gravar'}
               </button>
             </div>
