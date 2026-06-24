@@ -20,7 +20,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto p-2">
       {/* Boas-vindas */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h1 className="text-2xl font-black text-slate-800">
