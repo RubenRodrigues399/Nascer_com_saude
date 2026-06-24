@@ -14,7 +14,7 @@ export default function RecemNascidosPage() {
   const [apiRecords, setApiRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Consulta local IndexedDB (Mantida por segurança)
+  // Consulta local IndexedDB
   const localRecords = useLiveQuery(() => db.records.orderBy('createdAt').reverse().toArray()) || [];
 
   // Carrega dados da API ao iniciar
@@ -46,7 +46,7 @@ export default function RecemNascidosPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto p-2">
       {/* CABEÇALHO */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
         <div>
@@ -54,7 +54,7 @@ export default function RecemNascidosPage() {
           <p className="text-sm text-slate-500">Consulte o histórico central ou emita novos assentos de nascimento.</p>
         </div>
         <button 
-          onClick={() => router.push('/dashboard/recem-nascidos/create')} // Rota limpa padrão 🚀
+          onClick={() => router.push('/dashboard/recem-nascidos/create')} 
           className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm transition-colors shadow-sm whitespace-nowrap"
         >
           + Registar Nascimento
