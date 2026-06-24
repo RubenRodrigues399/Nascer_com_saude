@@ -133,13 +133,13 @@ export default function MunicipiosPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto p-2">
       
       {/* Cabeçalho */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Municípios de Angola</h1>
-          <p className="text-slate-500 text-sm">Selecione uma província para expor e gerir os seus municípios associados.</p>
+          <h1 className="text-xl font-bold text-slate-800">Municípios</h1>
+          <p className="text-slate-500 text-sm">Selecione uma província para expor e gerir os seus municípios.</p>
         </div>
         <div>
           <button
@@ -152,8 +152,8 @@ export default function MunicipiosPage() {
       </div>
 
       {/* Seletor de Província (Filtro Pai) */}
-      <div className="bg-white p-5 border border-slate-200 rounded-2xl shadow-sm space-y-2">
-        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+      <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm space-y-1">
+        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
           Filtrar por Província
         </label>
         <select
