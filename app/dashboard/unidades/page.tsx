@@ -30,12 +30,12 @@ export default function UnidadesListPage() {
     fetchUnidades();
   }, []);
 
-  if (loading) return <div className="p-6 text-slate-400 text-sm animate-pulse">A carregar unidades...</div>;
+  //if (loading) return <div className="p-6 text-slate-400 text-sm animate-pulse">A carregar unidades...</div>;
   if (error) return <div className="p-6 text-rose-500 text-sm font-semibold">{error}</div>;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto p-2">
-      {/* CABEÇALHO COM O BOTÃO EM FALTA 🚀 */}
+      {/* CABEÇALHO */}
       <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Unidades Hospitalares</h1>
