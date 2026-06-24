@@ -58,7 +58,7 @@ export default function ProvinciasPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto p-2">
       {/* CABEÇALHO */}
       <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
