@@ -17,18 +17,18 @@ export interface NewbornRecord {
 }
 
 export const newbornService = {
-  // Rota de listagem geral
-  getAllNewborns: async () => {
+  // Alterado para buscar por Unidade para evitar o 404 da rota global
+  getAllNewborns: async (unityId: number = 1) => {
     try {
-      const response = await axios.get('/dnirn/child/all');
+      // Se o back usar a rota por unidade, usamos esta. Se for outra, adaptamos o endpoint.
+      const response = await axios.get(`/dnirn/child/byUnity/${unityId}`);
       return { success: true, data: response.data.data || response.data };
-    } catch (error) {
-      console.error(error);
-      return { success: false, data: [] };
+    } catch (error: any) {
+      console.error('Erro ao buscar recém-nascidos:', error);
+      return { success: false, message: error.message, data: [] };
     }
   },
 
-  // Rota de criação baseada no teu Swagger 🚀
   createChild: async (payload: any) => {
     try {
       const response = await axios.post('/dnirn/child', payload);
