@@ -18,11 +18,11 @@ export default function LocationSelector({ onLocationChange }: LocationSelectorP
 
   const [loading, setLoading] = useState<boolean>(false);
 
-  // 1. Carrega todas as Províncias ao montar o componente
+  //Carregar todas as Províncias ao montar o componente
   useEffect(() => {
     const loadProvinces = async () => {
       try {
-        // [Passo 3]: Chamada limpa e direta
+        // Chamada limpa e direta
         const res = await locationsService.getAllProvinces();
         if (res.success) setProvinces(res.data);
       } catch (err) {
@@ -32,7 +32,7 @@ export default function LocationSelector({ onLocationChange }: LocationSelectorP
     loadProvinces();
   }, []);
 
-  // 2. Dispara sempre que a Província muda
+  // Dispara sempre que a Província muda
   const handleProvinceChange = async (provinceId: string) => {
     setSelectedProvince(provinceId);
     setSelectedMunicipality('');
@@ -45,7 +45,7 @@ export default function LocationSelector({ onLocationChange }: LocationSelectorP
 
     setLoading(true);
     try {
-      // [Passo 3]: Busca municípios filtrados pela Província de forma transparente
+      // Busca municípios filtrados pela Província de forma transparente
       const res = await locationsService.getMunicipalitiesByProvince(Number(provinceId));
       if (res.success) setMunicipalities(res.data);
     } catch (err) {
@@ -55,7 +55,7 @@ export default function LocationSelector({ onLocationChange }: LocationSelectorP
     }
   };
 
-  // 3. Dispara sempre que o Município muda
+  // Dispara sempre que o Município muda
   const handleMunicipalityChange = async (municipalityId: string) => {
     setSelectedMunicipality(municipalityId);
     setSelectedNeighborhood('');
@@ -66,7 +66,7 @@ export default function LocationSelector({ onLocationChange }: LocationSelectorP
 
     setLoading(true);
     try {
-      // [Passo 3]: Busca bairros filtrados pelo Município
+      // Busca bairros filtrados pelo Município
       const res = await locationsService.getNeighborhoodsByMunicipality(Number(municipalityId));
       if (res.success) setNeighborhoods(res.data);
     } catch (err) {
@@ -76,7 +76,7 @@ export default function LocationSelector({ onLocationChange }: LocationSelectorP
     }
   };
 
-  // 4. Dispara ao selecionar o Bairro final
+  // Dispara ao selecionar o Bairro final
   const handleNeighborhoodChange = (neighborhoodId: string) => {
     setSelectedNeighborhood(neighborhoodId);
     onLocationChange(neighborhoodId ? Number(neighborhoodId) : null);
