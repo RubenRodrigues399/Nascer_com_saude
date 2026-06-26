@@ -12,7 +12,7 @@ export const api = axios.create({
   },
 });
 
-// 1. INTERCEPTOR DE REQUEST: Injeta o Token de Acesso se ele existir
+// INTERCEPTOR DE REQUEST: Injeta o Token de Acesso se ele existir
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
@@ -29,13 +29,13 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 2. INTERCEPTOR DE RESPONSE: Deteta 401 (Expirado) e renova o Token automaticamente
+// INTERCEPTOR DE RESPONSE: Deteta 401 (Expirado) e renova o Token automaticamente
 api.interceptors.response.use(
   (response) => response, // Se a resposta for sucesso, deixa passar direto
   async (error) => {
     const originalRequest = error.config;
 
-    // Se o erro for 401 (Não Autorizado) e ainda não tentámos renovar esta requisição específica
+    // Se o erro for 401 e ainda não tentámos renovar esta requisição específica
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true; // Marca para não entrar em loop infinito
 
@@ -48,7 +48,7 @@ api.interceptors.response.use(
             const refreshToken = currentSession.tokenRefresh;
 
             if (refreshToken) {
-              // 🚀 Faz o pedido em segundo plano ao Back-End para obter um novo token
+              // Faz o pedido em segundo plano ao Back-End para obter um novo token
               // Nota: Usamos o URL direto ou o authService para evitar o interceptor comum
               const refreshResponse = await axios.post(
                 `${API_URL}/dnirn/auth/refresh-token`, 
