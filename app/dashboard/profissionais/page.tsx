@@ -41,7 +41,7 @@ export default function ProfessionalsListPage() {
           <p className="text-sm text-slate-500">Gestão de profissionais integrados na plataforma.</p>
         </div>
         <button 
-          onClick={() => router.push('/dashboard/profissionais/create')} // 🚀 Redireciona de forma nativa
+          onClick={() => router.push('/dashboard/profissionais/create')} // Redireciona de forma nativa
           className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-all shadow-sm active:scale-95 whitespace-nowrap"
         >
           + Novo Profissional
