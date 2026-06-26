@@ -94,10 +94,10 @@ export default function CreateUnidadePage() {
       return;
     }
 
-    // 🔥 Procura o objeto do bairro selecionado para extrair o nome em texto limpo
+    // Procura o objeto do bairro selecionado para extrair o nome em texto limpo
     const bairroSelecionado = bairros.find(b => b.id === Number(selectedBairroId));
 
-    // 🚀 Payload ajustado exatamente para o que o validador do teu Back-End exige
+    // Payload ajustado exatamente para o que o validador do teu Back-End exige
     const payload = {
       name: name.trim(),
       nif: nif.trim().toUpperCase(),
