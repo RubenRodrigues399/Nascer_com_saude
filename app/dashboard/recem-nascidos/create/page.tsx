@@ -18,11 +18,6 @@ export default function CreateRecemNascidoPage() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [maxDateStr, setMaxDateStr] = useState('');
-
-  // 1. Estados locais para garantir que a UI atualiza quando os dados carregarem
-  const [listaProvincias, setListaProvincias] = useState<any[]>([]);
-  const [listaMunicipios, setListaMunicipios] = useState<any[]>([]);
-  const [listaMaternidades, setListaMaternidades] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     nomeMae: '', biMae: '', nomePai: '', biPai: '', nomeCrianca: '',
@@ -31,21 +26,13 @@ export default function CreateRecemNascidoPage() {
     municipioId: '', provinciaId: ''  
   });
 
-  // 2. Consultas ao Dexie (Tentando mapear os nomes padrão: provinces, municipalities, unities)
-  const dbProvinces = useLiveQuery(() => db.provinces?.orderBy('name').toArray());
-  const dbMunicipalities = useLiveQuery(() => db.municipalities?.orderBy('name').toArray());
-  // Se a tua tabela se chamar 'maternidades' ou 'hospitals', altera o nome abaixo:
-  const dbUnities = useLiveQuery(() => db.unities?.orderBy('name').toArray() || db.hospitals?.orderBy('name').toArray());
+  // Puxa direto das tabelas do teu db.ts
+  const provinces = useLiveQuery(() => db.provinces.toArray()) || [];
+  const municipalities = useLiveQuery(() => db.municipalities.toArray()) || [];
+  const unities = useLiveQuery(() => db.unities.toArray()) || [];
 
-  // 3. Efeito para alimentar os estados assim que o IndexedDB responder
-  useEffect(() => {
-    if (dbProvinces) setListaProvincias(dbProvinces);
-    if (dbMunicipalities) setListaMunicipios(dbMunicipalities);
-    if (dbUnities) setListaMaternidades(dbUnities);
-  }, [dbProvinces, dbMunicipalities, dbUnities]);
-
-  // Filtra os municípios com base na província selecionada
-  const municipiosDisponiveis = listaMunicipios.filter(
+  // Filtro estrito convertendo tudo para Number
+  const municipiosDisponiveis = municipalities.filter(
     m => Number(m.provinceId) === Number(formData.provinciaId)
   );
 
@@ -88,30 +75,50 @@ export default function CreateRecemNascidoPage() {
     setLoading(true);
     setServerError('');
 
-    const muniObj = listaMunicipios.find(m => m.id === Number(formData.municipioId));
+    const muniObj = municipalities.find(m => Number(m.id) === Number(formData.municipioId));
 
-    // Montando a árvore estrutural exatamente como a API exige (Swagger)
-    const payload = {
+    // Monta o payload exatamente com as chaves que mostraste do Swagger
+    const payload: any = {
       individualChild: {
         fullName: formData.nomeCrianca.trim(),
         gender: formData.sexo === 'M' ? 'MALE' : 'FEMALE',
         identificationNumber: '',
         birthDate: `${formData.dataNascimento}T${formData.horaNascimento || '00:00:00'}`
       },
-      height: 50, weight: 3.2, vitalStatus: "ALIVE",
-      gestacionalAge: { weeks: 39, days: 0 },
-      placeOfBirth: "HOSPITAL", professionalSupport: true, 
+      height: 50,
+      weight: 3.4,
+      vitalStatus: "ALIVE",
+      gestacionalAge: {
+        weeks: 39,
+        days: 0
+      },
+      placeOfBirth: "HOSPITAL",
+      professionalSupport: true, 
       unityId: Number(formData.unityId),
       mother: {
-        fullName: formData.nomeMae.trim(), phoneNumber: "244900000000",
-        identificationDocument: { type: "BI", number: formData.biMae.toUpperCase().trim(), expirationDate: "2034-12-31T00:00:00" },
-        birthDate: "1995-01-01T00:00:00", municipalityId: Number(formData.municipioId), neighborhoodName: muniObj ? muniObj.name : "Sede"
+        fullName: formData.nomeMae.trim(),
+        phoneNumber: "244900000000",
+        identificationDocument: {
+          type: "BI",
+          number: formData.biMae.toUpperCase().trim(),
+          expirationDate: "2035-12-31" // Formato curto YYYY-MM-DD
+        },
+        birthDate: "1998-05-20", 
+        municipalityId: Number(formData.municipioId),
+        neighborhoodName: muniObj ? muniObj.name : "Sede"
       },
       father: formData.nomePai.trim() ? {
-        fullName: formData.nomePai.trim(), phoneNumber: "244900000000",
-        identificationDocument: { type: "BI", number: formData.biPai.toUpperCase().trim(), expirationDate: "2034-12-31T00:00:00" },
-        birthDate: "1995-01-01T00:00:00", municipalityId: Number(formData.municipioId), neighborhoodName: muniObj ? muniObj.name : "Sede"
-      } : null,
+        fullName: formData.nomePai.trim(),
+        phoneNumber: "244900000000",
+        identificationDocument: {
+          type: "BI",
+          number: formData.biPai.toUpperCase().trim(),
+          expirationDate: "2035-12-31"
+        },
+        birthDate: "1995-01-01",
+        municipalityId: Number(formData.municipioId),
+        neighborhoodName: muniObj ? muniObj.name : "Sede"
+      } : null, // Vai nulo se não preenchido para não quebrar a API
       witness: []
     };
 
@@ -123,11 +130,11 @@ export default function CreateRecemNascidoPage() {
         }
         router.push('/dashboard/recem-nascidos');
       } else {
-        setServerError(apiResponse.message || 'Erro de validação no servidor central.');
+        setServerError(apiResponse.message || 'Erro ao comunicar com a API central.');
         setLoading(false);
       }
-    } catch (err) { 
-      setServerError('Servidor indisponível no momento.');
+    } catch (err: any) { 
+      setServerError(err.message || 'Servidor indisponível.');
       setLoading(false);
     }
   };
@@ -152,15 +159,15 @@ export default function CreateRecemNascidoPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo da Mãe</label>
-              <input type="text" name="nomeMae" required value={formData.nomeMae} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              <input type="text" name="nomeMae" required value={formData.nomeMae} onChange={handleInputChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-800" />
               {errors.nomeMae && <p className="text-rose-600 text-xs mt-1">{errors.nomeMae}</p>}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nº do Bilhete da Mãe</label>
-              <input type="text" name="biMae" required value={formData.biMae} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg uppercase text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" maxLength={14} />
+              <input type="text" name="biMae" required value={formData.biMae} onChange={handleInputChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg uppercase text-slate-800" maxLength={14} />
               {errors.biMae && <p className="text-rose-600 text-xs mt-1">{errors.biMae}</p>}
             </div>
-            <button type="button" onClick={handleAvançarPasso1} className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-bold">Continuar ➔</button>
+            <button type="button" onClick={handleAvançarPasso1} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold">Continuar ➔</button>
           </div>
         )}
 
@@ -168,15 +175,15 @@ export default function CreateRecemNascidoPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Pai (Opcional)</label>
-              <input type="text" name="nomePai" value={formData.nomePai} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg text-slate-800" />
+              <input type="text" name="nomePai" value={formData.nomePai} onChange={handleInputChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-800" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">BI do Pai (Opcional)</label>
-              <input type="text" name="biPai" value={formData.biPai} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg uppercase text-slate-800" maxLength={14} />
+              <input type="text" name="biPai" value={formData.biPai} onChange={handleInputChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg uppercase text-slate-800" maxLength={14} />
             </div>
             <div className="flex gap-4">
-              <button type="button" onClick={() => setStep(1)} className="w-1/3 bg-slate-100 py-2.5 rounded-lg text-slate-700">Voltar</button>
-              <button type="button" onClick={handleAvançarPasso2} className="w-2/3 bg-blue-600 text-white py-2.5 rounded-lg font-bold">Continuar ➔</button>
+              <button type="button" onClick={() => setStep(1)} className="w-1/3 bg-slate-100 border py-2.5 rounded-lg text-slate-700">Voltar</button>
+              <button type="button" onClick={handleAvançarPasso2} className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold">Continuar ➔</button>
             </div>
           </div>
         )}
@@ -185,61 +192,56 @@ export default function CreateRecemNascidoPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Recém-Nascido</label>
-              <input type="text" name="nomeCrianca" required value={formData.nomeCrianca} onChange={handleInputChange} className="w-full px-4 py-2 border rounded-lg text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              <input type="text" name="nomeCrianca" required value={formData.nomeCrianca} onChange={handleInputChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-800" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <input type="date" name="dataNascimento" required max={maxDateStr} value={formData.dataNascimento} onChange={handleInputChange} className="px-4 py-2 border rounded-lg text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-              <input type="time" name="horaNascimento" required value={formData.horaNascimento} onChange={handleInputChange} className="px-4 py-2 border rounded-lg text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              <input type="date" name="dataNascimento" required max={maxDateStr} value={formData.dataNascimento} onChange={handleInputChange} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-800" />
+              <input type="time" name="horaNascimento" required value={formData.horaNascimento} onChange={handleInputChange} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-800" />
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <select name="sexo" required value={formData.sexo} onChange={handleInputChange} className="border p-2 rounded-lg bg-white text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <select name="sexo" required value={formData.sexo} onChange={handleInputChange} className="border border-slate-300 p-2 rounded-lg bg-white text-slate-800 text-sm">
                 <option value="">Género...</option>
                 <option value="M">Masculino</option>
                 <option value="F">Feminino</option>
               </select>
               
-              {/* SELECT DE MATERNIDADES */}
-              <select name="unityId" required value={formData.unityId} onChange={handleInputChange} className="col-span-2 border p-2 rounded-lg bg-white text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <select name="unityId" required value={formData.unityId} onChange={handleInputChange} className="col-span-2 border border-slate-300 p-2 rounded-lg bg-white text-slate-800 text-sm">
                 <option value="">Selecione a Maternidade...</option>
-                {listaMaternidades.map(u => (
+                {unities.map(u => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>
             </div>
-            {errors.unityId && <p className="text-rose-600 text-xs font-medium">{errors.unityId}</p>}
 
-            {/* PROVÍNCIAS E MUNICÍPIOS */}
             <div className="grid grid-cols-2 gap-4">
-              <select name="provinciaId" required value={formData.provinciaId} onChange={handleInputChange} className="border p-2 rounded-lg bg-white text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <select name="provinciaId" required value={formData.provinciaId} onChange={handleInputChange} className="border border-slate-300 p-2 rounded-lg bg-white text-slate-800 text-sm">
                 <option value="">Província...</option>
-                {listaProvincias.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {provinces.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              <select name="municipioId" required value={formData.municipioId} disabled={!formData.provinciaId} onChange={handleInputChange} className="border p-2 rounded-lg bg-white text-slate-800 text-sm disabled:bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <select name="municipioId" required value={formData.municipioId} disabled={!formData.provinciaId} onChange={handleInputChange} className="border border-slate-300 p-2 rounded-lg bg-white text-slate-800 text-sm disabled:bg-slate-50">
                 <option value="">Município...</option>
                 {municipiosDisponiveis.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
-            {errors.municipioId && <p className="text-rose-600 text-xs font-medium">{errors.municipioId}</p>}
 
             <div className="flex gap-4">
-              <button type="button" onClick={() => setStep(2)} className="w-1/3 bg-slate-100 py-2.5 rounded-lg text-slate-700">Voltar</button>
-              <button type="button" onClick={handleAvançarPasso3} className="w-2/3 bg-blue-600 text-white py-2.5 rounded-lg font-bold">Rever Dados ➔</button>
+              <button type="button" onClick={() => setStep(2)} className="w-1/3 bg-slate-100 border py-2.5 rounded-lg text-slate-700">Voltar</button>
+              <button type="button" onClick={handleAvançarPasso3} className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-bold">Rever Dados ➔</button>
             </div>
           </div>
         )}
 
         {step === 4 && (
           <div className="space-y-4">
-            <div className="bg-slate-50 p-4 rounded-xl text-sm space-y-1.5 text-slate-700 border shadow-inner">
-              <p><strong>Criança:</strong> {formData.nomeCrianca} ({formData.sexo === 'M' ? 'Masculino' : 'Feminino'})</p>
+            <div className="bg-slate-50 p-4 rounded-xl text-sm space-y-1.5 text-slate-700 border border-slate-200">
+              <p><strong>Criança:</strong> {formData.nomeCrianca}</p>
               <p><strong>Mãe:</strong> {formData.nomeMae}</p>
-              <p><strong>Pai:</strong> {formData.nomePai || 'Não Declarado'}</p>
-              <p><strong>Maternidade:</strong> {listaMaternidades.find(u => u.id === Number(formData.unityId))?.name || 'Não Selecionada'}</p>
+              <p><strong>Maternidade:</strong> {unities.find(u => Number(u.id) === Number(formData.unityId))?.name || 'Não Selecionada'}</p>
             </div>
             <div className="flex gap-4">
-              <button type="button" disabled={loading} onClick={() => setStep(3)} className="w-1/3 bg-slate-100 py-2.5 rounded-lg text-slate-700">Corrigir</button>
-              <button type="submit" disabled={loading} className="w-2/3 bg-emerald-600 text-white py-2.5 rounded-lg font-bold shadow-sm disabled:bg-slate-300">
-                {loading ? 'A Gravar na API...' : 'Confirmar e Gravar'}
+              <button type="button" disabled={loading} onClick={() => setStep(3)} className="w-1/3 bg-slate-100 border py-2.5 rounded-lg text-slate-700">Corrigir</button>
+              <button type="submit" disabled={loading} className="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg font-bold">
+                {loading ? 'A Gravar...' : 'Confirmar e Gravar'}
               </button>
             </div>
           </div>
