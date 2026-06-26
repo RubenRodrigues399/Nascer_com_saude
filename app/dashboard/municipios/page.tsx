@@ -19,7 +19,7 @@ export default function MunicipiosPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
-  // 1. Carrega o dropdown de províncias ao montar o ecrã
+  // Carregar o dropdown de províncias ao montar o ecrã
   const loadProvinces = async () => {
     try {
       const response = await locationsService.getAllProvinces();
@@ -40,7 +40,7 @@ export default function MunicipiosPage() {
     loadProvinces();
   }, []);
 
-  // 2. Carrega os municípios da província selecionada
+  // Carregar os municípios da província selecionada
   const loadMunicipalities = async () => {
     if (!selectedProvinceId) {
       setMunicipalities([]);
@@ -83,7 +83,7 @@ export default function MunicipiosPage() {
     loadMunicipalities();
   }, [selectedProvinceId]);
 
-  // 3. Abre o Modal pré-configurando a província ativa
+  // Abrir o Modal pré-configurando a província ativa
   const handleOpenModal = () => {
     setModalProvinceId(selectedProvinceId); // Se já tiver uma província no filtro, pré-seleciona
     setNewMuniName('');
@@ -91,7 +91,7 @@ export default function MunicipiosPage() {
     setIsModalOpen(true);
   };
 
-  // 4. Submissão do Formulário do Modal para a API Real
+  // Submeter o Formulário do Modal para a API Real
   const handleCreateMunicipio = async (e: React.FormEvent) => {
     e.preventDefault();
     setModalError('');
@@ -103,7 +103,6 @@ export default function MunicipiosPage() {
 
     setIsSubmitting(true);
     try {
-      // 🔥 AGORA SIM: Chamada real à API com os dados do formulário
       const response = await locationsService.createMunicipality({ 
         name: newMuniName.trim(), 
         provinceId: Number(modalProvinceId) 
@@ -213,7 +212,7 @@ export default function MunicipiosPage() {
       </div>
 
       {/* ============================================================================ */}
-      {/* COMPONENTE DO MODAL DE ADICIONAR MUNICÍPIO */}
+                      {/* COMPONENTE DO MODAL DE ADICIONAR MUNICÍPIO */}
       {/* ============================================================================ */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
