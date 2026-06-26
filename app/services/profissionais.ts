@@ -21,10 +21,8 @@ export interface CreateProfessionalDto {
   };
 }
 
-// Payload necessário para registar um Super Profissional (Geralmente com cargo de gestão global)
+// Payload necessário para registar um Super Profissional
 export interface CreateSuperProfessionalDto extends Omit<CreateProfessionalDto, 'roleProfessional'> {
-  // Caso o super profissional tenha permissões estendidas ou campos adicionais no teu Back-End,
-  // podes mapeá-los aqui de forma limpa.
   roleProfessional: 'ADMINISTRATIVE' | 'TECHNICAL' | 'ADMINISTRATIVE_SUPER'; 
 }
 
@@ -36,7 +34,7 @@ export interface ProfessionalRecord {
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
-  individual: IndividualData; // Reaproveita a interface detalhada que criámos no auth.ts
+  individual: IndividualData; 
 }
 
 interface ApiResponse<T> {
@@ -48,7 +46,7 @@ interface ApiResponse<T> {
 }
 
 // ============================================================================
-// MÉTODOS DE CONSUMO DA API — PROFISSIONAIS
+              // MÉTODOS DE CONSUMO DA API — PROFISSIONAIS
 // ============================================================================
 export const professionalsService = {
 
@@ -69,14 +67,14 @@ export const professionalsService = {
         const parsed = JSON.parse(session);
         token = parsed.tokenAccess;
         
-        // 1. Descobrir se quem está a operar o sistema é um Super Administrador
-        // Ajusta os campos 'role' ou 'roleProfessional' conforme vier guardado no teu objeto de user logado
+        // Descobrir se quem está a operar o sistema é um Super Administrador
+        // Ajusta os campos 'role' ou 'roleProfessional' conforme vier guardado no objeto de user logado
         const userRole = parsed.user?.role || parsed.user?.roleProfessional;
         if (userRole === 'ADMINISTRATIVE_SUPER') {
           isSuperUser = true;
         }
 
-        // 2. Extrair a unidade real dele se houver
+        // Extrair a unidade real dele se houver
         if (parsed.user?.unityId) {
           userUnityId = Number(parsed.user.unityId);
         }
@@ -85,13 +83,12 @@ export const professionalsService = {
 
     const API_KEY = process.env.NEXT_PUBLIC_DNIRN_API_KEY || 'dnirn00.@gmail.com';
 
-    // Se for Super, algumas APIs ignoram ou barram o unityId fixo, ajustamos preventivamente
     const payload = {
       ...data,
       unityId: userUnityId
     };
 
-    // 🚀 DEFINIÇÃO DINÂMICA DA ROTA: Se for super, aponta para /super, senão vai para a rota comum
+    // DEFINIÇÃO DINÂMICA DA ROTA: Se for super, aponta para /super, senão vai para a rota comum
     const targetRoute = isSuperUser ? '/dnirn/professionals/super' : '/dnirn/professionals';
     
     console.log(`[DNIRN Auth] Operador detetado como Super? ${isSuperUser}. Encaminhando para: ${targetRoute}`);
