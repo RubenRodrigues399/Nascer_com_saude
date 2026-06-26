@@ -123,7 +123,7 @@ export default function BirthForm() {
     const childBirthDate = `${formData.dataNascimento}T${formData.horaNascimento || '00:00:00'}`;
     const defaultPastDate = "1995-01-01T00:00:00"; // Data padrão limpa para os pais se o back exigir string formato completo
 
-    // 🔥 MAPEAR EXATAMENTE O PAYLOAD EXIGIDO DO SWAGGER
+    // MAPEAR EXATAMENTE O PAYLOAD EXIGIDO DO SWAGGER
     const payload = {
       individualChild: {
         fullName: formData.nomeCrianca.trim(),
@@ -182,7 +182,7 @@ export default function BirthForm() {
       console.warn("API Offline, mantendo gravação em cache local Dexie:", err);
     }
 
-    // Gravação offline resiliente de segurança (Estrutura original preservada)
+    // Gravação offline resiliente de segurança
     const novoRegisto = {
       id: generateUniqueOfflineId(),
       nomeMae: formData.nomeMae.trim(),
