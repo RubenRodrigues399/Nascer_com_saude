@@ -77,7 +77,7 @@ export default function CreateRecemNascidoPage() {
 
     const muniObj = municipalities.find(m => Number(m.id) === Number(formData.municipioId));
 
-    // Monta o payload exatamente com as chaves que mostraste do Swagger
+    // payload exatamente com as chaves do Swagger
     const payload: any = {
       individualChild: {
         fullName: formData.nomeCrianca.trim(),
@@ -118,7 +118,7 @@ export default function CreateRecemNascidoPage() {
         birthDate: "1995-01-01",
         municipalityId: Number(formData.municipioId),
         neighborhoodName: muniObj ? muniObj.name : "Sede"
-      } : null, // Vai nulo se não preenchido para não quebrar a API
+      } : null, 
       witness: []
     };
 
