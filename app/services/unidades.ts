@@ -15,23 +15,26 @@ export interface CreateUnityDto {
   neighborhoodId: number; // Vínculo territorial obrigatório (Bairro)
 }
 
-// Modelo estrutural de como a Unidade é retornada na API
+// Modelo estrutural real — baseado na resposta do Swagger
 export interface UnityRecord {
   id: number;
   name: string;
   nif: string;
   phoneNumber: string;
   email: string;
-  neighborhoodId: number;
   createdAt: string;
   updatedAt: string;
-  deleted: boolean;
-  // Caso o teu Back-End traga o objeto do bairro aninhado, 
-  // o teu grupo pode expandir esta propriedade mais tarde.
   neighborhood?: {
     id: number;
     name: string;
-    municipalityId: number;
+    municipality?: {
+      id: number;
+      name: string;
+      province?: {
+        id: number;
+        name: string;
+      };
+    };
   };
 }
 
@@ -63,6 +66,49 @@ export const unityService = {
    */
   getAllUnities: async (): Promise<ApiResponse<UnityRecord[]>> => {
     const response = await api.get('/dnirn/unity/all');
+    return response.data;
+  },
+
+  /**
+   * Obter os detalhes de uma Unidade pelo seu ID
+   * Rota: GET /dnirn/unity/getById/{id}
+   */
+  getUnityById: async (id: number): Promise<ApiResponse<UnityRecord>> => {
+    const response = await api.get(`/dnirn/unity/getById/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Obter os detalhes de uma Unidade pelo seu NIF
+   * Rota: GET /dnirn/unity/getByNif/{nif}
+   */
+  getUnityByNif: async (nif: string): Promise<ApiResponse<UnityRecord>> => {
+    const response = await api.get(`/dnirn/unity/getByNif/${nif}`);
+    return response.data;
+  },
+
+  /**
+   * Actualizar os dados de uma Unidade existente
+   * Rota: PUT /dnirn/unity/{unityId}
+   */
+  updateUnity: async (unityId: number, data: {
+    name: string;
+    nif: string;
+    phoneNumber: string;
+    email: string;
+    municipalityId: number;
+    neighborhoodName: string;
+  }): Promise<ApiResponse<UnityRecord>> => {
+    const response = await api.put(`/dnirn/unity/${unityId}`, data);
+    return response.data;
+  },
+
+  /**
+   * Apagar uma Unidade pelo seu ID
+   * Rota: DELETE /dnirn/unity/{id}
+   */
+  deleteUnity: async (id: number): Promise<ApiResponse<void>> => {
+    const response = await api.delete(`/dnirn/unity/${id}`);
     return response.data;
   }
 };

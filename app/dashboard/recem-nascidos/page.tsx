@@ -130,15 +130,23 @@ export default function RecemNascidosPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={async () => {
-                            await logAction('Reimpressão de PDF', `Segunda via emitida para ID: ${id}`);
-                            generateAssentoPDF({ id, nomeCrianca, dataNascimento: dataNasc, horaNascimento: horaNasc, sexo, nomeMae, nomePai, naturalDe: local, municipio: '', provincia: '' });
-                          }}
-                          className="text-blue-600 hover:text-blue-800 text-xs font-bold bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          Reimprimir
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => router.push(`/dashboard/recem-nascidos/${id}`)}
+                            className="text-slate-600 hover:text-slate-800 text-xs font-bold bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Ver
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await logAction('Reimpressão de PDF', `Segunda via emitida para ID: ${id}`);
+                              generateAssentoPDF({ id, nomeCrianca, dataNascimento: dataNasc, horaNascimento: horaNasc, sexo, nomeMae, nomePai, naturalDe: local, municipio: '', provincia: '' });
+                            }}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-bold bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Reimprimir
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

@@ -6,197 +6,191 @@ import { locationsService, Province, Municipality } from '@/app/services/locatio
 export default function MunicipiosPage() {
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string>('');
-  
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
   const [loadingMuni, setLoadingMuni] = useState(false);
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
 
-  // Estados do Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Modal de criação
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newMuniName, setNewMuniName] = useState('');
   const [modalProvinceId, setModalProvinceId] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [modalError, setModalError] = useState('');
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState('');
 
-  // Carregar o dropdown de províncias ao montar o ecrã
+  // Modal de edição
+  const [editingMuni, setEditingMuni] = useState<Municipality | null>(null);
+  const [editMuniName, setEditMuniName] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Confirmação de apagar
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const flash = (msg: string, isError = false) => {
+    isError ? setActionError(msg) : setActionMessage(msg);
+    setTimeout(() => isError ? setActionError('') : setActionMessage(''), 3500);
+  };
+
   const loadProvinces = async () => {
     try {
       const response = await locationsService.getAllProvinces();
       if (response.success) {
-        const dataPayload = response.data as any;
-        const extractedProvinces = Array.isArray(dataPayload) 
-          ? dataPayload 
-          : (dataPayload?.provinces || dataPayload?.list || []);
-        setProvinces(extractedProvinces);
+        const data = response.data as any;
+        setProvinces(Array.isArray(data) ? data : (data?.provinces || data?.list || []));
       }
     } catch (err) {
       console.error('Erro ao carregar províncias:', err);
-      setError('Não foi possível carregar as províncias estruturais.');
     }
   };
 
-  useEffect(() => {
-    loadProvinces();
-  }, []);
+  useEffect(() => { loadProvinces(); }, []);
 
-  // Carregar os municípios da província selecionada
-  const loadMunicipalities = async () => {
-    if (!selectedProvinceId) {
-      setMunicipalities([]);
-      setSuccessMessage('');
-      return;
-    }
-
+  const loadMunicipalities = async (provinceId: string) => {
+    if (!provinceId) { setMunicipalities([]); return; }
     setLoadingMuni(true);
-    setError('');
     try {
-      const response = await locationsService.getMunicipalitiesByProvince(Number(selectedProvinceId));
-      
+      const response = await locationsService.getMunicipalitiesByProvince(Number(provinceId));
       if (response.success) {
-        const dataPayload = response.data as any;
-        let extractedList: Municipality[] = [];
-
-        if (Array.isArray(dataPayload)) {
-          extractedList = dataPayload;
-        } else if (dataPayload && Array.isArray(dataPayload.municipalities)) {
-          extractedList = dataPayload.municipalities;
-        } else if (dataPayload && Array.isArray(dataPayload.list)) {
-          extractedList = dataPayload.list;
-        }
-
-        setMunicipalities(extractedList);
+        const data = response.data as any;
+        setMunicipalities(Array.isArray(data) ? data : (data?.municipalities || data?.list || []));
       } else {
         setMunicipalities([]);
-        setError(response.message || 'Sem municípios mapeados para esta região.');
       }
-    } catch (err: any) {
-      console.error('Erro ao carregar municípios:', err);
+    } catch {
       setMunicipalities([]);
-      setError('Ocorreu um erro ao carregar os municípios da província selecionada.');
     } finally {
       setLoadingMuni(false);
     }
   };
 
-  useEffect(() => {
-    loadMunicipalities();
-  }, [selectedProvinceId]);
+  useEffect(() => { loadMunicipalities(selectedProvinceId); }, [selectedProvinceId]);
 
-  // Abrir o Modal pré-configurando a província ativa
-  const handleOpenModal = () => {
-    setModalProvinceId(selectedProvinceId); // Se já tiver uma província no filtro, pré-seleciona
-    setNewMuniName('');
-    setModalError('');
-    setIsModalOpen(true);
-  };
-
-  // Submeter o Formulário do Modal para a API Real
-  const handleCreateMunicipio = async (e: React.FormEvent) => {
+  // --- CRIAR ---
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setModalError('');
-
+    setCreateError('');
     if (!newMuniName.trim() || !modalProvinceId) {
-      setModalError('Por favor, preencha o nome do município e selecione a província.');
+      setCreateError('Preencha o nome e a província.');
       return;
     }
-
-    setIsSubmitting(true);
+    setCreateLoading(true);
     try {
-      const response = await locationsService.createMunicipality({ 
-        name: newMuniName.trim(), 
-        provinceId: Number(modalProvinceId) 
-      });
-      
-      if (response.success) {
-        setSuccessMessage(response.message || 'Município adicionado com sucesso!');
-        setIsModalOpen(false); // Fecha o modal
-        
-        // Se criaste o município na província que estás a ver no momento, atualiza a tabela automaticamente
-        if (modalProvinceId === selectedProvinceId) {
-          loadMunicipalities();
-        } else {
-          // Se criaste noutra província, muda o filtro para essa província para ver o novo município lá
-          setSelectedProvinceId(modalProvinceId);
-        }
+      const res = await locationsService.createMunicipality({ name: newMuniName.trim(), provinceId: Number(modalProvinceId) });
+      if (res.success) {
+        setIsCreateOpen(false);
+        setNewMuniName('');
+        if (modalProvinceId === selectedProvinceId) loadMunicipalities(selectedProvinceId);
+        else setSelectedProvinceId(modalProvinceId);
+        flash('Município registado com sucesso.');
       } else {
-        setModalError(response.message || 'O servidor recusou o cadastro do município.');
+        setCreateError(res.message || 'Erro ao registar.');
       }
     } catch (err: any) {
-      console.error('Erro ao criar município:', err);
-      // Captura o erro real devolvido pelo teu Back-End (ex: "Município já existe")
-      setModalError(err.response?.data?.message || 'Falha ao registar o município no servidor.');
+      setCreateError(err.response?.data?.message || 'Erro de comunicação.');
     } finally {
-      setIsSubmitting(false);
+      setCreateLoading(false);
+    }
+  };
+
+  // --- EDITAR ---
+  const openEdit = (muni: Municipality) => {
+    setEditingMuni(muni);
+    setEditMuniName(muni.name);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMuni?.id || !editMuniName.trim()) return;
+    setEditLoading(true);
+    try {
+      const res = await locationsService.updateMunicipality(editingMuni.id, {
+        name: editMuniName.trim(),
+        provinceId: editingMuni.provinceId,
+      });
+      if (res.success) {
+        setEditingMuni(null);
+        loadMunicipalities(selectedProvinceId);
+        flash('Município actualizado com sucesso.');
+      } else {
+        flash(res.message || 'Erro ao actualizar.', true);
+      }
+    } catch {
+      flash('Erro de comunicação com o servidor.', true);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // --- APAGAR ---
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return;
+    setDeleteLoading(true);
+    try {
+      const res = await locationsService.deleteMunicipality(confirmDeleteId);
+      if (res.success) {
+        setConfirmDeleteId(null);
+        loadMunicipalities(selectedProvinceId);
+        flash('Município eliminado.');
+      } else {
+        flash(res.message || 'Erro ao eliminar.', true);
+        setConfirmDeleteId(null);
+      }
+    } catch {
+      flash('Erro de comunicação com o servidor.', true);
+      setConfirmDeleteId(null);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto p-2">
-      
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Municípios</h1>
-          <p className="text-slate-500 text-sm">Selecione uma província para expor e gerir os seus municípios.</p>
+          <p className="text-slate-500 text-sm">Selecione uma província para gerir os seus municípios.</p>
         </div>
-        <div>
-          <button
-            onClick={handleOpenModal}
-            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95"
-          >
-            <span className="text-lg leading-none">+</span> Adicionar Município
-          </button>
-        </div>
+        <button
+          onClick={() => { setModalProvinceId(selectedProvinceId); setNewMuniName(''); setCreateError(''); setIsCreateOpen(true); }}
+          className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2"
+        >
+          <span className="text-lg leading-none">+</span> Adicionar Município
+        </button>
       </div>
 
-      {/* Seletor de Província (Filtro Pai) */}
-      <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm space-y-1">
-        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-          Filtrar por Província
-        </label>
+      {/* Filtro */}
+      <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm">
+        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Filtrar por Província</label>
         <select
           value={selectedProvinceId}
           onChange={(e) => setSelectedProvinceId(e.target.value)}
           className="w-full md:w-1/3 px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-800 font-medium"
         >
           <option value="">-- Escolha uma Província --</option>
-          {provinces.map((prov) => (
-            <option key={prov.id} value={prov.id}>
-              {prov.name}
-            </option>
-          ))}
+          {provinces.map((prov) => <option key={prov.id} value={prov.id}>{prov.name}</option>)}
         </select>
       </div>
 
-      {/* Feedbacks na Tela Principal */}
-      {error && <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold">{error}</div>}
-      {successMessage && (
-        <div className="p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-xs rounded-lg font-bold animate-fadeIn">
-          ✓ {successMessage}
-        </div>
-      )}
+      {actionMessage && <div className="p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-xs rounded-lg font-bold">✓ {actionMessage}</div>}
+      {actionError && <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold">{actionError}</div>}
 
-      {/* Tabela de Resultados */}
+      {/* Tabela */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         {loadingMuni ? (
-          <div className="p-12 text-center text-slate-400 text-sm font-medium animate-pulse">
-            A consultar base de dados territorial...
-          </div>
+          <div className="p-12 text-center text-slate-400 text-sm animate-pulse">A consultar base de dados territorial...</div>
         ) : !selectedProvinceId ? (
-          <div className="p-12 text-center text-slate-400 text-sm">
-            Por favor, selecione uma província acima para visualizar os municípios.
-          </div>
+          <div className="p-12 text-center text-slate-400 text-sm">Selecione uma província acima para visualizar os municípios.</div>
         ) : municipalities.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-sm text-slate-500">
-            Nenhum município localizado ou mapeado para esta província.
-          </div>
+          <div className="p-12 text-center text-slate-400 text-sm">Nenhum município localizado para esta província.</div>
         ) : (
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">ID</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nome do Município</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acções</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -204,6 +198,22 @@ export default function MunicipiosPage() {
                 <tr key={muni.id} className="hover:bg-slate-50/80 transition-all text-slate-700 text-sm">
                   <td className="p-4 font-mono text-xs text-slate-400">{muni.id}</td>
                   <td className="p-4 font-semibold text-slate-800">{muni.name}</td>
+                  <td className="p-4">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => openEdit(muni)}
+                        className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(muni.id!)}
+                        className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
+                      >
+                        Apagar
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -211,93 +221,86 @@ export default function MunicipiosPage() {
         )}
       </div>
 
-      {/* ============================================================================ */}
-                      {/* COMPONENTE DO MODAL DE ADICIONAR MUNICÍPIO */}
-      {/* ============================================================================ */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden transform transition-all animate-scaleUp">
-            
-            {/* Cabeçalho do Modal */}
+      {/* MODAL DE CRIAÇÃO */}
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
             <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">Novo Município</h3>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
-              >
-                ✕
-              </button>
+              <button onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
             </div>
-
-            {/* Formulário */}
-            <form onSubmit={handleCreateMunicipio} className="p-6 space-y-4">
-              {modalError && (
-                <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold">
-                  {modalError}
-                </div>
-              )}
-
-              {/* Input: Nome */}
+            <form onSubmit={handleCreate} className="p-6 space-y-4">
+              {createError && <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold">{createError}</div>}
               <div className="space-y-1">
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Nome do Município
-                </label>
-                <input
-                  type="text"
-                  required
-                  disabled={isSubmitting}
-                  value={newMuniName}
-                  onChange={(e) => setNewMuniName(e.target.value)}
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nome do Município</label>
+                <input type="text" required disabled={createLoading} value={newMuniName} onChange={(e) => setNewMuniName(e.target.value)}
                   placeholder="Ex: Cazenga"
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                />
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               </div>
-
-              {/* Seletor: Província Alvo dentro do Modal */}
               <div className="space-y-1">
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Província de Pertencimento
-                </label>
-                <select
-                  required
-                  disabled={isSubmitting}
-                  value={modalProvinceId}
-                  onChange={(e) => setModalProvinceId(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium transition-all"
-                >
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Província</label>
+                <select required disabled={createLoading} value={modalProvinceId} onChange={(e) => setModalProvinceId(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
                   <option value="">-- Selecione a Província --</option>
-                  {provinces.map((prov) => (
-                    <option key={prov.id} value={prov.id}>
-                      {prov.name}
-                    </option>
-                  ))}
+                  {provinces.map((prov) => <option key={prov.id} value={prov.id}>{prov.name}</option>)}
                 </select>
               </div>
-
-              {/* Ações do Modal */}
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-sm flex items-center gap-2"
-                >
-                  {isSubmitting ? 'A gravar...' : 'Gravar Município'}
+                <button type="button" disabled={createLoading} onClick={() => setIsCreateOpen(false)} className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-xs font-bold uppercase tracking-wider">Cancelar</button>
+                <button type="submit" disabled={createLoading} className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-sm">
+                  {createLoading ? 'A gravar...' : 'Gravar Município'}
                 </button>
               </div>
             </form>
-            
           </div>
         </div>
       )}
 
+      {/* MODAL DE EDIÇÃO */}
+      {editingMuni && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">Editar Município</h3>
+              <button onClick={() => setEditingMuni(null)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nome do Município</label>
+                <input type="text" required disabled={editLoading} value={editMuniName} onChange={(e) => setEditMuniName(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" disabled={editLoading} onClick={() => setEditingMuni(null)} className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-xs font-bold uppercase tracking-wider">Cancelar</button>
+                <button type="submit" disabled={editLoading} className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-sm">
+                  {editLoading ? 'A guardar...' : 'Guardar Alterações'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMAÇÃO DE APAGAR */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl border p-6 text-center">
+            <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <h3 className="text-sm font-black text-slate-800 mb-1">Confirmar Eliminação</h3>
+            <p className="text-xs text-slate-500 mb-6">Os bairros associados a este município podem ser afectados.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDeleteId(null)} disabled={deleteLoading} className="flex-1 py-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button onClick={handleConfirmDelete} disabled={deleteLoading} className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white rounded-xl text-sm font-bold">
+                {deleteLoading ? 'A eliminar...' : 'Sim, Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

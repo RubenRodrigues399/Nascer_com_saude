@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/lib/api';
+import { authService } from '@/app/services/auth';
 import { useRouter } from 'next/navigation';
 import { logAction } from '@/utils/audit';
 
@@ -63,13 +63,13 @@ export default function ChangePasswordPage() {
       }
 
       // CHAMADA REAL À API DO SWAGGER
-      // Rota: /dnirn/auth/changePassword/{professionalId}
-      const response = await api.put(`/dnirn/auth/changePassword/${user?.professionalId}`, {
-        currentPassword, // Senha antiga recebida por SMS
-        newPassword      // Nova senha forte definida pelo utilizador
+      // Rota: POST /dnirn/auth/changePassword/{professionalId}
+      const response = await authService.changePassword(user!.professionalId, {
+        currentPassword,
+        newPassword,
       });
 
-      if (response.data?.success) {
+      if (response?.success) {
         setSuccess(true);
         if (logAction) {
           await logAction('Alteração Senha', `Profissional [${user?.fullName}] atualizou a palavra-passe com sucesso.`);
@@ -87,7 +87,7 @@ export default function ChangePasswordPage() {
           router.push('/dashboard');
         }, 1500);
       } else {
-        setError(response.data?.message || 'Falha ao atualizar a palavra-passe.');
+        setError(response?.message || 'Falha ao atualizar a palavra-passe.');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Erro de comunicação com o servidor. Tente novamente.');

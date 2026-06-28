@@ -20,8 +20,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Bairros', path: '/dashboard/bairros' },
     { name: 'Profissionais', path: '/dashboard/profissionais' },
     { name: 'Unidades', path: '/dashboard/unidades' },
+    { name: 'Cidadãos', path: '/dashboard/individuos' },
     { name: 'Recém-nascidos', path: '/dashboard/recem-nascidos' },
-    { name: 'Configurações', path: '/dashboard/configuracoes' },
+    { name: 'Conta', path: '/dashboard/conta' },
   ];
 
   return (

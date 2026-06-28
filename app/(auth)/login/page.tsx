@@ -126,12 +126,13 @@ const handleLogin = async (e: React.FormEvent) => {
           </div>
 
           <button
-            type="submit" 
+            type="submit"
             disabled={isSubmitting}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold py-3 px-4 rounded-xl text-sm uppercase tracking-wider flex justify-center items-center gap-2 transition-all shadow-sm active:scale-[0.99]"
           >
             {isSubmitting ? 'A verificar...' : 'Entrar no Sistema'}
           </button>
+
         </form>
       </div>
     </div>

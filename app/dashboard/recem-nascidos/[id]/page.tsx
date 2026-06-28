@@ -1,0 +1,487 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { newbornService } from '@/app/services/recem-nascidos';
+import { individualsService } from '@/app/services/individuos';
+import { locationsService, Province, Municipality } from '@/app/services/locations';
+import { validateBI } from '@/utils/validators';
+
+type FatherLookupState = 'idle' | 'searching' | 'found' | 'not_found' | 'submitting' | 'done';
+
+interface FatherForm {
+  fullName: string;
+  phoneNumber: string;
+  docType: 'BI' | 'PASSAPORT' | 'DNV';
+  docNumber: string;
+  docExpiry: string;
+  birthDate: string;
+  municipalityId: string;
+  neighborhoodName: string;
+}
+
+const emptyFatherForm: FatherForm = {
+  fullName: '', phoneNumber: '', docType: 'BI',
+  docNumber: '', docExpiry: '', birthDate: '',
+  municipalityId: '', neighborhoodName: '',
+};
+
+export default function ChildDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+
+  const [child, setChild] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState('');
+
+  // Lookup de pai
+  const [lookupPhone, setLookupPhone] = useState('');
+  const [lookupState, setLookupState] = useState<FatherLookupState>('idle');
+  const [lookupError, setLookupError] = useState('');
+  const [fatherForm, setFatherForm] = useState<FatherForm>(emptyFatherForm);
+  const [formErrors, setFormErrors] = useState<Partial<FatherForm>>({});
+  const [submitError, setSubmitError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  // Cascata de localização para o formulário do pai
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
+  const [selectedProvinceId, setSelectedProvinceId] = useState('');
+  const [loadingMuni, setLoadingMuni] = useState(false);
+
+  // Carrega dados da criança
+  useEffect(() => {
+    if (!id) return;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await newbornService.getChildById(id as string);
+        if (res.success) setChild(res.data);
+        else setPageError('Registo não encontrado.');
+      } catch {
+        setPageError('Erro ao carregar os dados do registo.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [id]);
+
+  // Carrega províncias para o formulário de pai
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await locationsService.getAllProvinces();
+        if (res.success) {
+          const data = res.data as any;
+          setProvinces(Array.isArray(data) ? data : (data?.list || []));
+        }
+      } catch { /* silent */ }
+    };
+    load();
+  }, []);
+
+  // Cascata municípios
+  useEffect(() => {
+    setMunicipalities([]);
+    setFatherForm(f => ({ ...f, municipalityId: '', neighborhoodName: '' }));
+    if (!selectedProvinceId) return;
+    const load = async () => {
+      setLoadingMuni(true);
+      try {
+        const res = await locationsService.getMunicipalitiesByProvince(Number(selectedProvinceId));
+        if (res.success) {
+          const data = res.data as any;
+          setMunicipalities(Array.isArray(data) ? data : (data?.municipalities || data?.list || []));
+        }
+      } catch { /* silent */ } finally { setLoadingMuni(false); }
+    };
+    load();
+  }, [selectedProvinceId]);
+
+  // --- PASSO 1: Pesquisar pai pelo telefone ---
+  const handleLookup = async () => {
+    const phone = lookupPhone.trim();
+    if (!phone) return;
+    setLookupState('searching');
+    setLookupError('');
+    setFatherForm(emptyFatherForm);
+    setSelectedProvinceId('');
+
+    try {
+      const res = await individualsService.getIndividualByPhone(phone);
+      if (res.success && res.data) {
+        const ind = res.data as any;
+        // Pré-preenche o formulário com os dados encontrados
+        setFatherForm({
+          fullName: ind.fullName || '',
+          phoneNumber: phone,
+          docType: ind.identificationDocument?.type || 'BI',
+          docNumber: ind.identificationDocument?.number || '',
+          docExpiry: ind.identificationDocument?.expirationDate?.split('T')[0] || '',
+          birthDate: ind.birthDate?.split('T')[0] || '',
+          municipalityId: String(ind.municipality?.id || ''),
+          neighborhoodName: ind.neighborhood?.name || '',
+        });
+        setLookupState('found');
+      } else {
+        // Não encontrado — pré-preenche só o telefone e deixa o utilizador preencher o resto
+        setFatherForm({ ...emptyFatherForm, phoneNumber: phone });
+        setLookupState('not_found');
+      }
+    } catch {
+      setFatherForm({ ...emptyFatherForm, phoneNumber: phone });
+      setLookupState('not_found');
+    }
+  };
+
+  // --- PASSO 2: Submeter addFather ---
+  const validate = (): boolean => {
+    const errs: Partial<FatherForm> = {};
+    if (fatherForm.fullName.trim().split(' ').length < 2) errs.fullName = 'Introduza o nome completo.';
+    if (!fatherForm.phoneNumber.trim()) errs.phoneNumber = 'Telefone obrigatório.';
+    if (!fatherForm.docNumber.trim()) errs.docNumber = 'Número do documento obrigatório.';
+    if (!fatherForm.docExpiry) errs.docExpiry = 'Data de validade obrigatória.';
+    if (!fatherForm.birthDate) errs.birthDate = 'Data de nascimento obrigatória.';
+    if (!fatherForm.municipalityId) errs.municipalityId = 'Município obrigatório.';
+    if (!fatherForm.neighborhoodName.trim()) errs.neighborhoodName = 'Bairro obrigatório.';
+    setFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleSubmitFather = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLookupState('submitting');
+    setSubmitError('');
+
+    const payload = {
+      childId: id as string,
+      father: {
+        fullName: fatherForm.fullName.trim(),
+        phoneNumber: fatherForm.phoneNumber.trim(),
+        identificationDocument: {
+          type: fatherForm.docType,
+          number: fatherForm.docNumber.toUpperCase().trim(),
+          expirationDate: fatherForm.docExpiry,
+        },
+        birthDate: fatherForm.birthDate,
+        municipalityId: Number(fatherForm.municipalityId),
+        neighborhoodName: fatherForm.neighborhoodName.trim(),
+      },
+    };
+
+    try {
+      const res = await newbornService.addFather(payload);
+      if (res.success) {
+        setSubmitSuccess(true);
+        setLookupState('done');
+        // Recarrega os dados da criança para reflectir o pai adicionado
+        const refreshed = await newbornService.getChildById(id as string);
+        if (refreshed.success) setChild(refreshed.data);
+      } else {
+        setSubmitError(res.message || 'Erro ao adicionar o pai.');
+        setLookupState(lookupState === 'found' ? 'found' : 'not_found');
+      }
+    } catch {
+      setSubmitError('Erro de comunicação com o servidor.');
+      setLookupState('not_found');
+    }
+  };
+
+  const hasFather = child?.father || child?.parentChild?.some((p: any) => p.type === 'FATHER');
+
+  // ---- RENDER ----
+
+  if (loading) return <div className="p-8 text-center text-slate-400 animate-pulse">A carregar registo...</div>;
+  if (pageError) return (
+    <div className="max-w-2xl mx-auto p-4">
+      <button onClick={() => router.back()} className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase mb-4 block">← Voltar</button>
+      <div className="p-4 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-sm rounded-lg font-semibold">{pageError}</div>
+    </div>
+  );
+
+  const childName = child?.individualChild?.fullName || child?.child?.fullName || 'N/D';
+  const childGender = child?.individualChild?.gender === 'MALE' ? 'Masculino' : 'Feminino';
+  const childBirth = child?.individualChild?.birthDate?.split('T')[0] || 'N/D';
+  const motherName = child?.mother?.fullName || 'N/D';
+  const fatherName = child?.father?.fullName || (hasFather ? 'Registado' : null);
+  const unityName = child?.unity?.name || 'N/D';
+  const vitalStatus = child?.vitalStatus === 'ALIVE' ? 'Vivo' : 'Falecido';
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6 p-2">
+      {/* Cabeçalho */}
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <button onClick={() => router.push('/dashboard/recem-nascidos')} className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase mb-4 block">← Voltar à lista</button>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Assento de Nascimento</p>
+            <h1 className="text-2xl font-black text-slate-800">{childName}</h1>
+            <p className="text-xs font-mono text-slate-400 mt-1">{id}</p>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-xs font-bold ${vitalStatus === 'Vivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+            {vitalStatus}
+          </span>
+        </div>
+      </div>
+
+      {/* Dados da Criança */}
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h2 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-4">Dados da Criança</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+          <InfoField label="Género" value={childGender} />
+          <InfoField label="Data de Nascimento" value={childBirth} />
+          <InfoField label="Local de Nascimento" value={child?.placeOfBirth || 'N/D'} />
+          <InfoField label="Peso" value={child?.weight ? `${child.weight} kg` : 'N/D'} />
+          <InfoField label="Altura" value={child?.height ? `${child.height} cm` : 'N/D'} />
+          <InfoField label="Idade Gestacional" value={child?.gestacionalAge ? `${child.gestacionalAge.weeks}s ${child.gestacionalAge.days}d` : 'N/D'} />
+          <InfoField label="Unidade Hospitalar" value={unityName} />
+          <InfoField label="Apoio Profissional" value={child?.professionalSupport ? 'Sim' : 'Não'} />
+        </div>
+      </div>
+
+      {/* Dados da Mãe */}
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h2 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-4">Dados da Mãe</h2>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <InfoField label="Nome Completo" value={motherName} />
+          <InfoField label="Telefone" value={child?.mother?.phoneNumber || 'N/D'} />
+          <InfoField label="Documento" value={child?.mother?.identificationDocument?.number || 'N/D'} />
+          <InfoField label="Data de Nascimento" value={child?.mother?.birthDate?.split('T')[0] || 'N/D'} />
+        </div>
+      </div>
+
+      {/* Dados do Pai */}
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h2 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-4">Dados do Pai</h2>
+
+        {hasFather ? (
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <InfoField label="Nome Completo" value={fatherName || 'N/D'} />
+            <InfoField label="Telefone" value={child?.father?.phoneNumber || 'N/D'} />
+            <InfoField label="Documento" value={child?.father?.identificationDocument?.number || 'N/D'} />
+            <InfoField label="Data de Nascimento" value={child?.father?.birthDate?.split('T')[0] || 'N/D'} />
+          </div>
+        ) : lookupState === 'done' ? (
+          <div className="p-4 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-sm rounded-lg font-bold">
+            Pai adicionado com sucesso ao registo.
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <p className="text-sm text-slate-500 italic">Nenhum pai registado neste assento.</p>
+
+            {/* PASSO 1: Pesquisar por telefone */}
+            {(lookupState === 'idle') && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Pesquisar pai pelo número de telefone</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={lookupPhone}
+                    onChange={(e) => setLookupPhone(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
+                    placeholder="Ex: 923000000"
+                    className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleLookup}
+                    disabled={!lookupPhone.trim()}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold rounded-xl text-sm transition-colors"
+                  >
+                    Pesquisar
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Se o cidadão já existir no sistema, os dados serão pré-preenchidos automaticamente.
+                </p>
+              </div>
+            )}
+
+            {lookupState === 'searching' && (
+              <div className="flex items-center gap-3 text-sm text-slate-400 animate-pulse">
+                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                A pesquisar no sistema...
+              </div>
+            )}
+
+            {/* PASSO 2: Resultado da pesquisa + formulário */}
+            {(lookupState === 'found' || lookupState === 'not_found' || lookupState === 'submitting') && (
+              <form onSubmit={handleSubmitFather} className="space-y-4">
+                {/* Banner de resultado */}
+                {lookupState === 'found' ? (
+                  <div className="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-emerald-800">Cidadão encontrado no sistema</p>
+                      <p className="text-xs text-emerald-700 mt-0.5">Os dados foram pré-preenchidos. Verifique e confirme.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="w-6 h-6 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-amber-800">Cidadão não encontrado</p>
+                      <p className="text-xs text-amber-700 mt-0.5">Preencha os dados abaixo para registar o pai.</p>
+                    </div>
+                  </div>
+                )}
+
+                {submitError && (
+                  <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold">{submitError}</div>
+                )}
+
+                {/* Campos do formulário */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nome Completo *</label>
+                    <input
+                      type="text" required disabled={lookupState === 'submitting'}
+                      value={fatherForm.fullName}
+                      onChange={(e) => setFatherForm(f => ({ ...f, fullName: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      placeholder="Nome Apelido"
+                    />
+                    {formErrors.fullName && <p className="text-xs text-rose-600">{formErrors.fullName}</p>}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Telefone *</label>
+                    <input
+                      type="text" required disabled={lookupState === 'submitting'}
+                      value={fatherForm.phoneNumber}
+                      onChange={(e) => setFatherForm(f => ({ ...f, phoneNumber: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    {formErrors.phoneNumber && <p className="text-xs text-rose-600">{formErrors.phoneNumber}</p>}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Data de Nascimento *</label>
+                    <input
+                      type="date" required disabled={lookupState === 'submitting'}
+                      value={fatherForm.birthDate}
+                      onChange={(e) => setFatherForm(f => ({ ...f, birthDate: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    {formErrors.birthDate && <p className="text-xs text-rose-600">{formErrors.birthDate}</p>}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Tipo de Documento *</label>
+                    <select
+                      disabled={lookupState === 'submitting'}
+                      value={fatherForm.docType}
+                      onChange={(e) => setFatherForm(f => ({ ...f, docType: e.target.value as any }))}
+                      className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="BI">BI</option>
+                      <option value="PASSAPORT">Passaporte</option>
+                      <option value="DNV">DNV</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nº do Documento *</label>
+                    <input
+                      type="text" required disabled={lookupState === 'submitting'}
+                      value={fatherForm.docNumber}
+                      onChange={(e) => setFatherForm(f => ({ ...f, docNumber: e.target.value.toUpperCase() }))}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    {formErrors.docNumber && <p className="text-xs text-rose-600">{formErrors.docNumber}</p>}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Validade do Documento *</label>
+                    <input
+                      type="date" required disabled={lookupState === 'submitting'}
+                      value={fatherForm.docExpiry}
+                      onChange={(e) => setFatherForm(f => ({ ...f, docExpiry: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    {formErrors.docExpiry && <p className="text-xs text-rose-600">{formErrors.docExpiry}</p>}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Província</label>
+                    <select
+                      disabled={lookupState === 'submitting'}
+                      value={selectedProvinceId}
+                      onChange={(e) => setSelectedProvinceId(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="">-- Escolha a Província --</option>
+                      {provinces.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Município *</label>
+                    <select
+                      required disabled={lookupState === 'submitting' || !selectedProvinceId || loadingMuni}
+                      value={fatherForm.municipalityId}
+                      onChange={(e) => setFatherForm(f => ({ ...f, municipalityId: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-slate-300 bg-white disabled:bg-slate-50 disabled:text-slate-400 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      <option value="">{loadingMuni ? 'A carregar...' : '-- Escolha o Município --'}</option>
+                      {municipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                    {formErrors.municipalityId && <p className="text-xs text-rose-600">{formErrors.municipalityId}</p>}
+                  </div>
+
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nome do Bairro *</label>
+                    <input
+                      type="text" required disabled={lookupState === 'submitting'}
+                      value={fatherForm.neighborhoodName}
+                      onChange={(e) => setFatherForm(f => ({ ...f, neighborhoodName: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      placeholder="Ex: Palanca"
+                    />
+                    {formErrors.neighborhoodName && <p className="text-xs text-rose-600">{formErrors.neighborhoodName}</p>}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => { setLookupState('idle'); setLookupPhone(''); setFatherForm(emptyFatherForm); setSelectedProvinceId(''); setFormErrors({}); setSubmitError(''); }}
+                    disabled={lookupState === 'submitting'}
+                    className="w-1/3 py-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={lookupState === 'submitting'}
+                    className="w-2/3 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl text-sm font-bold transition-colors"
+                  >
+                    {lookupState === 'submitting' ? 'A registar...' : 'Confirmar e Adicionar Pai'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InfoField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="text-sm font-semibold text-slate-800">{value}</p>
+    </div>
+  );
+}
