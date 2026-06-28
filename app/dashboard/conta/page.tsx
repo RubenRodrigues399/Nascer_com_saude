@@ -9,6 +9,7 @@ type OtpStep = 1 | 2 | 3;
 
 export default function ContaPage() {
   const { user } = useAuth();
+  const isAdmin = user?.roleProfessional === 'ADMINISTRATIVE' || user?.roleProfessional === 'ADMINISTRATIVE_SUPER';
   const [activeTab, setActiveTab] = useState<Tab>('change');
 
   // ── Alterar senha (conhece a senha atual) ──────────────────────────────────
@@ -203,7 +204,7 @@ export default function ContaPage() {
         </p>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — OTP só visível para ADMINISTRATIVE e ADMINISTRATIVE_SUPER */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6">
         <button
           onClick={() => setActiveTab('change')}
@@ -215,6 +216,7 @@ export default function ContaPage() {
         >
           Alterar Palavra-Passe
         </button>
+        {isAdmin && (
         <button
           onClick={() => { setActiveTab('otp'); resetOtpFlow(); }}
           className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
@@ -225,6 +227,7 @@ export default function ContaPage() {
         >
           Redefinir por Código SMS
         </button>
+        )}
       </div>
 
       {/* ── TAB A: Alterar Senha ──────────────────────────────────────────── */}
@@ -299,8 +302,8 @@ export default function ContaPage() {
         </div>
       )}
 
-      {/* ── TAB B: Redefinir por OTP ──────────────────────────────────────── */}
-      {activeTab === 'otp' && (
+      {/* ── TAB B: Redefinir por OTP — apenas ADMINISTRATIVE e ADMINISTRATIVE_SUPER ── */}
+      {activeTab === 'otp' && isAdmin && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           <p className="text-xs text-slate-500 mb-5">
             Utilize esta opção se não sabe a palavra-passe atual. Um código será enviado por SMS para verificar a sua identidade.
