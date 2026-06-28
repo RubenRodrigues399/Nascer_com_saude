@@ -107,11 +107,11 @@ export const authService = {
     return response.data;
   },
 
-  /** * Verificar o número de telefone para iniciar a recuperação de senha (rota pública)
+  /** * Verificar o número de telefone e disparar OTP por SMS (rota autenticada — requer Bearer token)
    * Rota: GET /dnirn/professionals/verifyPhoneNumber-recover/{phoneNumber}
    */
   verifyPhoneForRecovery: async (phoneNumber: string): Promise<ApiResponse<void>> => {
-    const response = await publicApi.get(`/dnirn/professionals/verifyPhoneNumber-recover/${phoneNumber}`);
+    const response = await api.get(`/dnirn/professionals/verifyPhoneNumber-recover/${phoneNumber}`);
     return response.data;
   },
 
