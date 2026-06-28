@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { logAction } from '@/utils/audit';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -126,12 +127,18 @@ const handleLogin = async (e: React.FormEvent) => {
           </div>
 
           <button
-            type="submit" 
+            type="submit"
             disabled={isSubmitting}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold py-3 px-4 rounded-xl text-sm uppercase tracking-wider flex justify-center items-center gap-2 transition-all shadow-sm active:scale-[0.99]"
           >
             {isSubmitting ? 'A verificar...' : 'Entrar no Sistema'}
           </button>
+
+          <div className="text-center pt-1">
+            <Link href="/recover-password" className="text-[11px] text-slate-400 hover:text-blue-600 font-semibold transition-colors">
+              Esqueceu a palavra-passe?
+            </Link>
+          </div>
         </form>
       </div>
     </div>

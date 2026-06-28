@@ -83,8 +83,8 @@ export function useNetworkSync() {
         // -----------------------------------------------------------------
         // FLUXO DE PRODUÇÃO REAL COM TOKEN JWT INTERCEPTADO
         // -----------------------------------------------------------------
-        // Enviamos o payload para a rota correta do teu Back-End (ex: /dnirn/newborns ou correspondente)
-        const response = await api.post('/dnirn/unity', record);
+        // Enviamos o payload para a rota de registo de crianças
+        const response = await api.post('/dnirn/child', record);
 
         if (response.status === 200 || response.status === 201) {
           // Atualiza o estado na interface local para 'sincronizado' (US-02, US-09)

@@ -125,5 +125,21 @@ export const professionalsService = {
   getProfessionalById: async (professionalId: string): Promise<ApiResponse<ProfessionalRecord>> => {
     const response = await api.get(`/dnirn/professionals/${professionalId}`);
     return response.data;
+  },
+
+  /** * Consultar profissional pelo número de telefone
+   * Rota: GET /dnirn/professionals/byPhoneNumber/{phoneNumber}
+   */
+  getProfessionalByPhone: async (phoneNumber: string): Promise<ApiResponse<ProfessionalRecord>> => {
+    const response = await api.get(`/dnirn/professionals/byPhoneNumber/${phoneNumber}`);
+    return response.data;
+  },
+
+  /** * Eliminar um profissional pelo ID
+   * Rota: DELETE /dnirn/professionals/{professionalId}
+   */
+  deleteProfessional: async (professionalId: string): Promise<ApiResponse<void>> => {
+    const response = await api.delete(`/dnirn/professionals/${professionalId}`);
+    return response.data;
   }
 };
