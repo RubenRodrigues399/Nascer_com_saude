@@ -15,23 +15,26 @@ export interface CreateUnityDto {
   neighborhoodId: number; // Vínculo territorial obrigatório (Bairro)
 }
 
-// Modelo estrutural de como a Unidade é retornada na API
+// Modelo estrutural real — baseado na resposta do Swagger
 export interface UnityRecord {
   id: number;
   name: string;
   nif: string;
   phoneNumber: string;
   email: string;
-  neighborhoodId: number;
   createdAt: string;
   updatedAt: string;
-  deleted: boolean;
-  // Caso o teu Back-End traga o objeto do bairro aninhado, 
-  // o teu grupo pode expandir esta propriedade mais tarde.
   neighborhood?: {
     id: number;
     name: string;
-    municipalityId: number;
+    municipality?: {
+      id: number;
+      name: string;
+      province?: {
+        id: number;
+        name: string;
+      };
+    };
   };
 }
 

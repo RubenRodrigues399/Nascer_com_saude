@@ -5,13 +5,32 @@ import { useRouter } from 'next/navigation';
 import { unityService, UnityRecord } from '@/app/services/unidades';
 import { locationsService, Province, Municipality } from '@/app/services/locations';
 
+type SearchMode = 'all' | 'nif' | 'id';
+
+function locationPath(uni: UnityRecord) {
+  const parts = [
+    uni.neighborhood?.municipality?.province?.name,
+    uni.neighborhood?.municipality?.name,
+    uni.neighborhood?.name,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' › ') : 'N/D';
+}
+
 export default function UnidadesListPage() {
   const router = useRouter();
-  const [unidades, setUnidades] = useState<UnityRecord[]>([]);
+
+  const [allUnidades, setAllUnidades] = useState<UnityRecord[]>([]);
+  const [displayed, setDisplayed] = useState<UnityRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
+
+  // Pesquisa
+  const [searchMode, setSearchMode] = useState<SearchMode>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchError, setSearchError] = useState('');
 
   // Modal de edição
   const [editingUnity, setEditingUnity] = useState<UnityRecord | null>(null);
@@ -35,57 +54,101 @@ export default function UnidadesListPage() {
     setTimeout(() => isError ? setActionError('') : setActionMessage(''), 3500);
   };
 
-  const loadUnidades = async () => {
+  const loadAll = async () => {
     try {
       setLoading(true);
-      const response = await unityService.getAllUnities();
-      if (response.success) setUnidades(response.data);
-    } catch (err) {
-      console.error('Erro ao carregar unidades:', err);
-      setError('Não foi possível carregar a lista de unidades hospitalares.');
+      const res = await unityService.getAllUnities();
+      if (res.success) {
+        setAllUnidades(res.data);
+        setDisplayed(res.data);
+      }
+    } catch {
+      setError('Não foi possível carregar a lista de unidades.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadUnidades(); }, []);
+  useEffect(() => { loadAll(); }, []);
 
-  // Carrega províncias para o modal de edição
+  // Províncias para o modal
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await locationsService.getAllProvinces();
-        if (res.success) {
-          const data = res.data as any;
-          setProvinces(Array.isArray(data) ? data : (data?.provinces || []));
-        }
-      } catch { /* silent */ }
-    };
-    load();
+    locationsService.getAllProvinces().then(res => {
+      if (res.success) {
+        const data = res.data as any;
+        setProvinces(Array.isArray(data) ? data : (data?.provinces || []));
+      }
+    }).catch(() => {});
   }, []);
 
-  // Cascata município ao seleccionar província no modal de edição
+  // Cascata município no modal
   useEffect(() => {
     setEditMunicipalities([]);
     setEditMunicipalityId('');
     if (!editProvinceId) return;
-    const load = async () => {
-      setLoadingMuni(true);
-      try {
-        const res = await locationsService.getMunicipalitiesByProvince(Number(editProvinceId));
-        if (res.success) {
-          const data = res.data as any;
-          setEditMunicipalities(Array.isArray(data) ? data : (data?.municipalities || data?.list || []));
-        }
-      } catch { /* silent */ } finally { setLoadingMuni(false); }
-    };
-    load();
+    setLoadingMuni(true);
+    locationsService.getMunicipalitiesByProvince(Number(editProvinceId)).then(res => {
+      if (res.success) {
+        const data = res.data as any;
+        setEditMunicipalities(Array.isArray(data) ? data : (data?.municipalities || data?.list || []));
+      }
+    }).catch(() => {}).finally(() => setLoadingMuni(false));
   }, [editProvinceId]);
 
-  // --- EDITAR ---
+  // Quando muda o modo de pesquisa, repõe
+  const handleModeChange = (mode: SearchMode) => {
+    setSearchMode(mode);
+    setSearchQuery('');
+    setSearchError('');
+    if (mode === 'all') setDisplayed(allUnidades);
+  };
+
+  // Pesquisa
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchError('');
+    const q = searchQuery.trim();
+    if (!q) return;
+
+    setSearchLoading(true);
+    try {
+      if (searchMode === 'nif') {
+        const res = await unityService.getUnityByNif(q);
+        if (res.success && res.data) {
+          setDisplayed([res.data]);
+        } else {
+          setDisplayed([]);
+          setSearchError(res.message || 'Nenhuma unidade encontrada com esse NIF.');
+        }
+      } else if (searchMode === 'id') {
+        const id = parseInt(q, 10);
+        if (isNaN(id)) { setSearchError('Introduza um ID numérico válido.'); return; }
+        const res = await unityService.getUnityById(id);
+        if (res.success && res.data) {
+          setDisplayed([res.data]);
+        } else {
+          setDisplayed([]);
+          setSearchError(res.message || 'Nenhuma unidade encontrada com esse ID.');
+        }
+      }
+    } catch (err: any) {
+      setDisplayed([]);
+      setSearchError(err.response?.data?.message || 'Erro ao pesquisar. Tente novamente.');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Editar
   const openEdit = (uni: UnityRecord) => {
     setEditingUnity(uni);
-    setEditForm({ name: uni.name, nif: uni.nif, phoneNumber: uni.phoneNumber, email: uni.email, neighborhoodName: uni.neighborhood?.name ?? '' });
+    setEditForm({
+      name: uni.name,
+      nif: uni.nif,
+      phoneNumber: uni.phoneNumber,
+      email: uni.email,
+      neighborhoodName: uni.neighborhood?.name ?? '',
+    });
     setEditProvinceId('');
     setEditMunicipalityId('');
     setEditMunicipalities([]);
@@ -110,7 +173,7 @@ export default function UnidadesListPage() {
       });
       if (res.success) {
         setEditingUnity(null);
-        loadUnidades();
+        loadAll();
         flash('Unidade actualizada com sucesso.');
       } else {
         setEditError(res.message || 'Erro ao actualizar.');
@@ -122,7 +185,7 @@ export default function UnidadesListPage() {
     }
   };
 
-  // --- APAGAR ---
+  // Apagar
   const handleConfirmDelete = async () => {
     if (!confirmDeleteId) return;
     setDeleteLoading(true);
@@ -130,7 +193,7 @@ export default function UnidadesListPage() {
       const res = await unityService.deleteUnity(confirmDeleteId);
       if (res.success) {
         setConfirmDeleteId(null);
-        loadUnidades();
+        loadAll();
         flash('Unidade eliminada com sucesso.');
       } else {
         flash(res.message || 'Erro ao eliminar.', true);
@@ -148,6 +211,7 @@ export default function UnidadesListPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto p-2">
+
       {/* CABEÇALHO */}
       <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
@@ -165,30 +229,85 @@ export default function UnidadesListPage() {
       {actionMessage && <div className="p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-xs rounded-lg font-bold">✓ {actionMessage}</div>}
       {actionError && <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold">{actionError}</div>}
 
-      {/* TABELA PRINCIPAL */}
+      {/* PAINEL DE PESQUISA */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+        {/* Selector de modo */}
+        <div className="flex gap-2 flex-wrap">
+          {([['all', 'Todas as Unidades'], ['nif', 'Pesquisar por NIF'], ['id', 'Pesquisar por ID']] as [SearchMode, string][]).map(([mode, label]) => (
+            <button
+              key={mode}
+              onClick={() => handleModeChange(mode)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${
+                searchMode === mode
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Barra de pesquisa */}
+        {searchMode !== 'all' && (
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <input
+              type={searchMode === 'id' ? 'number' : 'text'}
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setSearchError(''); }}
+              placeholder={searchMode === 'nif' ? 'Ex: 6851409466' : 'Ex: 3'}
+              className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none font-mono"
+            />
+            <button
+              type="submit"
+              disabled={searchLoading || !searchQuery.trim()}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all"
+            >
+              {searchLoading ? 'A pesquisar...' : 'Pesquisar'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchQuery(''); setDisplayed(allUnidades); setSearchError(''); }}
+              className="px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50"
+            >
+              Limpar
+            </button>
+          </form>
+        )}
+
+        {searchError && (
+          <div className="p-3 bg-amber-50 border-l-4 border-amber-400 text-amber-800 text-xs rounded-lg font-semibold">
+            {searchError}
+          </div>
+        )}
+      </div>
+
+      {/* TABELA */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+              <th className="p-4">ID</th>
               <th className="p-4">Nome da Unidade</th>
               <th className="p-4">NIF</th>
               <th className="p-4">Telemóvel</th>
-              <th className="p-4">Localidade / Bairro</th>
+              <th className="p-4">Localização</th>
               <th className="p-4 text-right">Acções</th>
             </tr>
           </thead>
           <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={5} className="p-8 text-center text-slate-400 animate-pulse">A carregar unidades...</td></tr>
-            ) : unidades.length === 0 ? (
-              <tr><td colSpan={5} className="p-8 text-center text-slate-400">Nenhuma unidade cadastrada no sistema central.</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-slate-400 animate-pulse">A carregar unidades...</td></tr>
+            ) : displayed.length === 0 ? (
+              <tr><td colSpan={6} className="p-8 text-center text-slate-400">Nenhuma unidade encontrada.</td></tr>
             ) : (
-              unidades.map((uni) => (
+              displayed.map((uni) => (
                 <tr key={uni.id} className="hover:bg-slate-50/60 transition-all">
+                  <td className="p-4 font-mono text-xs text-slate-400">{uni.id}</td>
                   <td className="p-4 font-semibold text-slate-800">{uni.name}</td>
                   <td className="p-4 font-mono text-xs text-slate-600">{uni.nif || 'N/D'}</td>
                   <td className="p-4 text-slate-600">{uni.phoneNumber || 'N/D'}</td>
-                  <td className="p-4 text-slate-500">{uni.neighborhood?.name || 'N/D'}</td>
+                  <td className="p-4 text-xs text-slate-500">{locationPath(uni)}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
                       <button
@@ -210,6 +329,9 @@ export default function UnidadesListPage() {
             )}
           </tbody>
         </table>
+        <div className="px-4 py-2 border-t border-slate-100 text-[11px] text-slate-400">
+          {displayed.length} unidade(s) apresentada(s)
+        </div>
       </div>
 
       {/* MODAL DE EDIÇÃO */}
@@ -253,7 +375,7 @@ export default function UnidadesListPage() {
                 <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Nova Localização *</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Província</label>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Província *</label>
                     <select disabled={editLoading} value={editProvinceId} onChange={(e) => setEditProvinceId(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                       <option value="">-- Escolha --</option>

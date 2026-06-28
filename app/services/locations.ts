@@ -55,7 +55,7 @@ export const locationsService = {
 
   /** Editar dados de uma Província */
   updateProvince: async (provinceId: number, data: { name: string }): Promise<ApiResponse<Province>> => {
-    const response = await api.put(`/dnirn/provinces/${provinceId}`, data);
+    const response = await api.patch(`/dnirn/provinces/${provinceId}`, data);
     return response.data;
   },
 
@@ -93,7 +93,7 @@ export const locationsService = {
 
   /** Editar dados de um Município */
   updateMunicipality: async (municipalityId: number, data: { name: string; provinceId: number }): Promise<ApiResponse<Municipality>> => {
-    const response = await api.put(`/dnirn/municipalities/${municipalityId}`, data);
+    const response = await api.patch(`/dnirn/municipalities/${municipalityId}`, data);
     return response.data;
   },
 
@@ -131,7 +131,7 @@ export const locationsService = {
 
   /** Actualizar dados de um Bairro */
   updateBairro: async (id: number, data: { name: string; municipalityId: number }): Promise<ApiResponse<Neighborhood>> => {
-    const response = await api.put(`/dnirn/neighborhoods/${id}`, data);
+    const response = await api.patch(`/dnirn/neighborhoods/${id}`, data);
     return response.data;
   },
 
