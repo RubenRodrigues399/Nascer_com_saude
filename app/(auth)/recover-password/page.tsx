@@ -13,6 +13,7 @@ export default function RecoverPasswordPage() {
   const [step, setStep] = useState<Step>(1);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otpToken, setOtpToken] = useState(''); // token retornado pelo validateOTP
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -84,6 +85,7 @@ export default function RecoverPasswordPage() {
         code,
       });
       if (result.success) {
+        setOtpToken(result.data?.token ?? '');
         setStep(3);
       } else {
         setError(result.message || 'Código inválido ou expirado. Verifique o SMS.');
@@ -114,7 +116,7 @@ export default function RecoverPasswordPage() {
       const result = await authService.recoverPassword({
         phoneNumber: phoneNumber.trim(),
         newPassword,
-        confirmPassword,
+        token: otpToken,
       });
       if (result.success) {
         setSuccess(true);

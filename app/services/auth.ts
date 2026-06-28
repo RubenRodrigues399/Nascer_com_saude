@@ -105,18 +105,18 @@ export const authService = {
     return response.data;
   },
 
-  /** * Validar o código OTP recebido por SMS
+  /** * Validar o código OTP recebido por SMS — retorna token para usar no passo seguinte
    * Rota: POST /dnirn/auth/validateOTP
    */
-  validateOTP: async (data: { phoneNumber: string; type: 'RECOVER_PASSWORD'; code: string }): Promise<ApiResponse<{ verified: boolean }>> => {
+  validateOTP: async (data: { phoneNumber: string; type: 'RECOVER_PASSWORD'; code: string }): Promise<ApiResponse<{ token: string }>> => {
     const response = await api.post('/dnirn/auth/validateOTP', data);
     return response.data;
   },
 
-  /** * Redefinir a senha usando o token de recuperação
+  /** * Redefinir a senha usando o token retornado pelo validateOTP
    * Rota: POST /dnirn/auth/recover-password
    */
-  recoverPassword: async (data: { phoneNumber: string; newPassword: string; confirmPassword: string }): Promise<ApiResponse<void>> => {
+  recoverPassword: async (data: { phoneNumber: string; newPassword: string; token: string }): Promise<ApiResponse<void>> => {
     const response = await api.post('/dnirn/auth/recover-password', data);
     return response.data;
   }

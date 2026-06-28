@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { unityService, UnityRecord } from '@/app/services/unidades';
+import { locationsService, Province, Municipality } from '@/app/services/locations';
 
 export default function UnidadesListPage() {
   const router = useRouter();
@@ -14,9 +15,16 @@ export default function UnidadesListPage() {
 
   // Modal de edição
   const [editingUnity, setEditingUnity] = useState<UnityRecord | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', nif: '', phoneNumber: '', email: '' });
+  const [editForm, setEditForm] = useState({ name: '', nif: '', phoneNumber: '', email: '', neighborhoodName: '' });
+  const [editMunicipalityId, setEditMunicipalityId] = useState('');
+  const [editProvinceId, setEditProvinceId] = useState('');
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
+
+  // Localização para o modal de edição
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [editMunicipalities, setEditMunicipalities] = useState<Municipality[]>([]);
+  const [loadingMuni, setLoadingMuni] = useState(false);
 
   // Confirmação de apagar
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -42,23 +50,63 @@ export default function UnidadesListPage() {
 
   useEffect(() => { loadUnidades(); }, []);
 
+  // Carrega províncias para o modal de edição
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await locationsService.getAllProvinces();
+        if (res.success) {
+          const data = res.data as any;
+          setProvinces(Array.isArray(data) ? data : (data?.provinces || []));
+        }
+      } catch { /* silent */ }
+    };
+    load();
+  }, []);
+
+  // Cascata município ao seleccionar província no modal de edição
+  useEffect(() => {
+    setEditMunicipalities([]);
+    setEditMunicipalityId('');
+    if (!editProvinceId) return;
+    const load = async () => {
+      setLoadingMuni(true);
+      try {
+        const res = await locationsService.getMunicipalitiesByProvince(Number(editProvinceId));
+        if (res.success) {
+          const data = res.data as any;
+          setEditMunicipalities(Array.isArray(data) ? data : (data?.municipalities || data?.list || []));
+        }
+      } catch { /* silent */ } finally { setLoadingMuni(false); }
+    };
+    load();
+  }, [editProvinceId]);
+
   // --- EDITAR ---
   const openEdit = (uni: UnityRecord) => {
     setEditingUnity(uni);
-    setEditForm({ name: uni.name, nif: uni.nif, phoneNumber: uni.phoneNumber, email: uni.email });
+    setEditForm({ name: uni.name, nif: uni.nif, phoneNumber: uni.phoneNumber, email: uni.email, neighborhoodName: uni.neighborhood?.name ?? '' });
+    setEditProvinceId('');
+    setEditMunicipalityId('');
+    setEditMunicipalities([]);
     setEditError('');
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUnity?.id) return;
+    if (!editMunicipalityId) { setEditError('Seleccione o município.'); return; }
+    if (!editForm.neighborhoodName.trim()) { setEditError('Introduza o nome do bairro.'); return; }
     setEditLoading(true);
     setEditError('');
     try {
       const res = await unityService.updateUnity(editingUnity.id, {
-        ...editForm,
-        unityId: editingUnity.id,
-        neighborhoodId: editingUnity.neighborhoodId,
+        name: editForm.name,
+        nif: editForm.nif,
+        phoneNumber: editForm.phoneNumber,
+        email: editForm.email,
+        municipalityId: Number(editMunicipalityId),
+        neighborhoodName: editForm.neighborhoodName.trim(),
       });
       if (res.success) {
         setEditingUnity(null);
@@ -200,7 +248,36 @@ export default function UnidadesListPage() {
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400">A localização (bairro) não pode ser alterada aqui. Para mudar a localização, registe uma nova unidade.</p>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
+                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Nova Localização *</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Província</label>
+                    <select disabled={editLoading} value={editProvinceId} onChange={(e) => setEditProvinceId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                      <option value="">-- Escolha --</option>
+                      {provinces.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Município *</label>
+                    <select disabled={editLoading || !editProvinceId || loadingMuni} value={editMunicipalityId}
+                      onChange={(e) => setEditMunicipalityId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 bg-white disabled:bg-slate-100 disabled:text-slate-400 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                      <option value="">{loadingMuni ? 'A carregar...' : '-- Escolha --'}</option>
+                      {editMunicipalities.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Nome do Bairro *</label>
+                  <input type="text" disabled={editLoading} value={editForm.neighborhoodName}
+                    onChange={(e) => setEditForm(f => ({ ...f, neighborhoodName: e.target.value }))}
+                    placeholder="Ex: Palanca"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                </div>
+              </div>
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button type="button" disabled={editLoading} onClick={() => setEditingUnity(null)} className="px-4 py-2 text-slate-500 hover:bg-slate-50 rounded-xl text-xs font-bold uppercase tracking-wider">Cancelar</button>
                 <button type="submit" disabled={editLoading} className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-sm">

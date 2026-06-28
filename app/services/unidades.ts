@@ -88,7 +88,14 @@ export const unityService = {
    * Actualizar os dados de uma Unidade existente
    * Rota: PUT /dnirn/unity/{unityId}
    */
-  updateUnity: async (unityId: number, data: Partial<CreateUnityDto> & { unityId: number }): Promise<ApiResponse<UnityRecord>> => {
+  updateUnity: async (unityId: number, data: {
+    name: string;
+    nif: string;
+    phoneNumber: string;
+    email: string;
+    municipalityId: number;
+    neighborhoodName: string;
+  }): Promise<ApiResponse<UnityRecord>> => {
     const response = await api.put(`/dnirn/unity/${unityId}`, data);
     return response.data;
   },
