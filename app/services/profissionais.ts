@@ -38,15 +38,21 @@ export interface CreateSuperProfessionalDto {
   phoneNumber: string;
 }
 
-// Modelo estrutural de como o profissional é retornado na listagem da API
+// Modelo estrutural de como o profissional é retornado pela API
 export interface ProfessionalRecord {
   id: string;
   roleProfessional: 'ADMINISTRATIVE' | 'TECHNICAL' | 'ADMINISTRATIVE_SUPER';
-  unityId: number;
-  createdAt: string;
-  updatedAt: string;
-  deleted: boolean;
-  individual: IndividualData; 
+  individual: IndividualData;
+  unity?: {
+    id: number;
+    name: string;
+    nif?: string;
+    phoneNumber?: string;
+    email?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+  deleted?: boolean;
 }
 
 interface ApiResponse<T> {
@@ -118,33 +124,31 @@ export const professionalsService = {
     return response.data;
   },
 
-  /** * Listar todos os profissionais registados na base central da DNIRN
-   * Rota: GET /dnirn/professionals/all
-   */
+  /** Rota: GET /dnirn/professionals/all */
   getAllProfessionals: async (): Promise<ApiResponse<ProfessionalRecord[]>> => {
     const response = await api.get('/dnirn/professionals/all');
     return response.data;
   },
 
-  /** * Obter o perfil detalhado de um funcionário específico através do seu ID
-   * Rota: GET /dnirn/professionals/{professionalId}
-   */
+  /** Rota: GET /dnirn/professionals/{professionalId} */
   getProfessionalById: async (professionalId: string): Promise<ApiResponse<ProfessionalRecord>> => {
     const response = await api.get(`/dnirn/professionals/${professionalId}`);
     return response.data;
   },
 
-  /** * Consultar profissional pelo número de telefone
-   * Rota: GET /dnirn/professionals/byPhoneNumber/{phoneNumber}
-   */
+  /** Rota: GET /dnirn/professionals/byPhoneNumber/{phoneNumber} */
   getProfessionalByPhone: async (phoneNumber: string): Promise<ApiResponse<ProfessionalRecord>> => {
     const response = await api.get(`/dnirn/professionals/byPhoneNumber/${phoneNumber}`);
     return response.data;
   },
 
-  /** * Eliminar um profissional pelo ID
-   * Rota: DELETE /dnirn/professionals/{professionalId}
-   */
+  /** Rota: GET /dnirn/professionals/verifyPhoneNumber-recover/{phoneNumber} */
+  verifyPhoneNumberRecover: async (phoneNumber: string): Promise<ApiResponse<ProfessionalRecord>> => {
+    const response = await api.get(`/dnirn/professionals/verifyPhoneNumber-recover/${phoneNumber}`);
+    return response.data;
+  },
+
+  /** Rota: DELETE /dnirn/professionals/{professionalId} */
   deleteProfessional: async (professionalId: string): Promise<ApiResponse<void>> => {
     const response = await api.delete(`/dnirn/professionals/${professionalId}`);
     return response.data;
