@@ -1,29 +1,41 @@
 //Gestão de funcionários/profissionais
 
 import { api } from './api';
-import { IndividualData, IdentificationDocument } from './auth';
+import { IndividualData } from './auth';
 
 // ============================================================================
 // INTERFACES / TIPOS PARA GESTÃO DE PROFISSIONAIS
 // ============================================================================
 
-// Payload necessário para registar um profissional comum
-export interface CreateProfessionalDto {
-  roleProfessional: 'ADMINISTRATIVE' | 'TECHNICAL' | 'ADMINISTRATIVE_SUPER';
-  unityId: number;
-  individual: {
-    fullName: string;
-    gender: 'MALE' | 'FEMALE';
-    birthDate: string; // Formato YYYY-MM-DD
-    phoneNumber: string;
-    neighborhoodId: number;
-    identificationDocument: IdentificationDocument;
-  };
+export interface IdentificationDocumentInput {
+  type: 'BI' | 'PASSAPORT' | 'DNV';
+  number: string;
+  expirationDate: string; // YYYY-MM-DD
 }
 
-// Payload necessário para registar um Super Profissional
-export interface CreateSuperProfessionalDto extends Omit<CreateProfessionalDto, 'roleProfessional'> {
-  roleProfessional: 'ADMINISTRATIVE' | 'TECHNICAL' | 'ADMINISTRATIVE_SUPER'; 
+export interface ProfessionalIndividualInput {
+  fullName: string;
+  gender: 'MALE' | 'FEMALE';
+  identificationDocument: IdentificationDocumentInput;
+  birthDate: string; // YYYY-MM-DD
+  municipalityId: number;
+  neighborhoodName: string;
+  role: 'PROFESSIONAL'; // obrigatório pela API
+}
+
+// POST /dnirn/professionals
+export interface CreateProfessionalDto {
+  individual: ProfessionalIndividualInput;
+  phoneNumber: string;
+  roleProfessional: 'ADMINISTRATIVE' | 'TECHNICAL' | 'ADMINISTRATIVE_SUPER';
+  municipalityId: number; // obrigatório também na raiz
+  idUnity: number;
+}
+
+// POST /dnirn/professionals/super
+export interface CreateSuperProfessionalDto {
+  individual: ProfessionalIndividualInput;
+  phoneNumber: string;
 }
 
 // Modelo estrutural de como o profissional é retornado na listagem da API
@@ -50,12 +62,7 @@ interface ApiResponse<T> {
 // ============================================================================
 export const professionalsService = {
 
-  /** * Registar um novo profissional associado a uma unidade/maternidade específica
-   * Rota: POST /dnirn/professionals
-   */
-  /** * Registar um novo profissional associado a uma unidade/maternidade específica
-   * Rota: POST /dnirn/professionals
-   */
+  /** Rota: POST /dnirn/professionals (ou /super para ADMINISTRATIVE_SUPER) */
  createProfessional: async (data: CreateProfessionalDto): Promise<ApiResponse<ProfessionalRecord>> => {
     let token = '';
     let isSuperUser = false;
@@ -84,8 +91,8 @@ export const professionalsService = {
     const API_KEY = process.env.NEXT_PUBLIC_DNIRN_API_KEY || 'dnirn00.@gmail.com';
 
     const payload = {
+      idUnity: userUnityId, // fallback da sessão; data.idUnity sobrepõe se vier do form
       ...data,
-      unityId: userUnityId
     };
 
     // DEFINIÇÃO DINÂMICA DA ROTA: Se for super, aponta para /super, senão vai para a rota comum
