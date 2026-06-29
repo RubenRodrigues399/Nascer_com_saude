@@ -384,21 +384,13 @@ export default function CreateChildPage() {
     setLoading(true);
     setServerError('');
 
-<<<<<<< HEAD
     const payload: CreateChildDto = {
-=======
-    const muniObj = municipalities.find(m => Number(m.id) === Number(formData.municipioId));
-
-    // payload exatamente com as chaves do Swagger
-    const payload: any = {
->>>>>>> 1822ed3e77f82bd508d871208e17e760aaa44242
       individualChild: {
         fullName: childName.trim(),
         gender: childGender,
         identificationNumber: childDocNumber.trim(),
         birthDate: `${childBirthDate}T${childBirthTime}:00`,
       },
-<<<<<<< HEAD
       height: Number(height),
       weight: Number(weight),
       vitalStatus,
@@ -410,43 +402,6 @@ export default function CreateChildPage() {
       mother: toParentInput(mother),
       father: includeFather ? toParentInput(father) : null,
       witness: [],
-=======
-      height: 50,
-      weight: 3.4,
-      vitalStatus: "ALIVE",
-      gestacionalAge: {
-        weeks: 39,
-        days: 0
-      },
-      placeOfBirth: "HOSPITAL",
-      professionalSupport: true, 
-      unityId: Number(formData.unityId),
-      mother: {
-        fullName: formData.nomeMae.trim(),
-        phoneNumber: "244900000000",
-        identificationDocument: {
-          type: "BI",
-          number: formData.biMae.toUpperCase().trim(),
-          expirationDate: "2035-12-31" // Formato curto YYYY-MM-DD
-        },
-        birthDate: "1998-05-20", 
-        municipalityId: Number(formData.municipioId),
-        neighborhoodName: muniObj ? muniObj.name : "Sede"
-      },
-      father: formData.nomePai.trim() ? {
-        fullName: formData.nomePai.trim(),
-        phoneNumber: "244900000000",
-        identificationDocument: {
-          type: "BI",
-          number: formData.biPai.toUpperCase().trim(),
-          expirationDate: "2035-12-31"
-        },
-        birthDate: "1995-01-01",
-        municipalityId: Number(formData.municipioId),
-        neighborhoodName: muniObj ? muniObj.name : "Sede"
-      } : null, 
-      witness: []
->>>>>>> 1822ed3e77f82bd508d871208e17e760aaa44242
     };
 
     try {
