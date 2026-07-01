@@ -25,6 +25,11 @@ export interface Neighborhood {
   };
 }
 
+export interface CreateNeighborhoodDto {
+  name: string;
+  municipalityId: number;
+}
+
 // ApiResponse genérica baseada no padrão do teu Back-End
 interface ApiResponse<T> {
   status: number;
@@ -106,7 +111,7 @@ export const locationsService = {
   // --- BAIRROS ---
 
   /** Registrar um novo Bairro */
-  createBairro: async (data: Neighborhood): Promise<ApiResponse<Neighborhood>> => {
+  createBairro: async (data: CreateNeighborhoodDto): Promise<ApiResponse<Neighborhood>> => {
     const response = await api.post('/dnirn/neighborhoods', data);
     return response.data;
   },

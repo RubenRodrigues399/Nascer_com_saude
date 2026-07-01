@@ -21,6 +21,7 @@ interface UserSession {
   tokenAccess: string;
   tokenRefresh: string;
   loginTimestamp: number;
+  mustChangePassword?: boolean;
 }
 
 interface AuthContextType {

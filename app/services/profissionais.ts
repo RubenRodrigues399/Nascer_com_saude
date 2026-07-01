@@ -96,9 +96,9 @@ export const professionalsService = {
 
     const API_KEY = process.env.NEXT_PUBLIC_DNIRN_API_KEY || 'dnirn00.@gmail.com';
 
-    const payload = {
-      idUnity: userUnityId, // fallback da sessão; data.idUnity sobrepõe se vier do form
+    const payload: CreateProfessionalDto = {
       ...data,
+      idUnity: data.idUnity || userUnityId, // data.idUnity sobrepõe; cai para a sessão só se vier vazio
     };
 
     // DEFINIÇÃO DINÂMICA DA ROTA: Se for super, aponta para /super, senão vai para a rota comum

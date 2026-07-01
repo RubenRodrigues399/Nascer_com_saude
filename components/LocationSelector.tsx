@@ -67,7 +67,7 @@ export default function LocationSelector({ onLocationChange }: LocationSelectorP
     setLoading(true);
     try {
       // Busca bairros filtrados pelo Município
-      const res = await locationsService.getNeighborhoodsByMunicipality(Number(municipalityId));
+      const res = await locationsService.getBairrosByMunicipality(Number(municipalityId));
       if (res.success) setNeighborhoods(res.data);
     } catch (err) {
       console.error('Erro ao carregar bairros:', err);

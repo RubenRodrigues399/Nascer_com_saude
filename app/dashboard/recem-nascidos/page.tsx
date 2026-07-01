@@ -99,7 +99,7 @@ function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: (
               await logAction('Reimpressão de PDF', `Segunda via para ID: ${id}`);
               generateAssentoPDF({ id, nomeCrianca, dataNascimento: dataNasc, horaNascimento: horaNasc,
                 sexo: record.individual?.gender === 'MALE' ? 'M' : 'F',
-                nomeMae, nomePai: nomePai || 'Não Declarado', naturalDe: local, municipio: '', provincia: '' });
+                nomeMae, biMae: docMae, nomePai: nomePai || 'Não Declarado', naturalDe: local, municipio: '', provincia: '' });
             }}
             className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-sm">Imprimir</button>
         </div>
