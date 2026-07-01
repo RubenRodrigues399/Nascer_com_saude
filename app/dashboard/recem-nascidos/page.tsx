@@ -23,7 +23,9 @@ export default function RecemNascidosPage() {
       try {
         const response = await newbornService.getAllNewborns();
         if (response.success) {
-          setApiRecords(response.data);
+          // Se a API devolver um objeto direto no "data" em vez de um Array, envolvemo-lo num array.
+          const dataFromApi = Array.isArray(response.data) ? response.data : [response.data];
+          setApiRecords(dataFromApi.filter(Boolean));
         }
       } catch (err) {
         console.error('Erro ao buscar da API, usando dados locais:', err);
@@ -37,10 +39,14 @@ export default function RecemNascidosPage() {
   // Junta ou prioriza os registos para exibição
   const recordsToDisplay = apiRecords.length > 0 ? apiRecords : localRecords;
 
-  // Filtro Reativo
+  // Filtro Reativo Normalizado para evitar quebras por valores nulos
   const filteredRecords = recordsToDisplay.filter(record => {
-    const nomeBaby = record.nomeCrianca || record.individualChild?.fullName || '';
-    const nomeMother = record.nomeMae || record.mother?.fullName || '';
+    const childObj = record.individual || record.individualChild || record;
+    const motherObj = record.mother?.individual || record.mother || record;
+
+    const nomeBaby = childObj?.fullName || record.nomeCrianca || '';
+    const nomeMother = motherObj?.fullName || record.nomeMae || '';
+
     return nomeBaby.toLowerCase().includes(searchTerm.toLowerCase()) ||
            nomeMother.toLowerCase().includes(searchTerm.toLowerCase());
   });
@@ -97,18 +103,41 @@ export default function RecemNascidosPage() {
                 </tr>
               ) : (
                 filteredRecords.map((record) => {
+                  // Mapeamento Dinâmico Inteligente das duas estruturas (Local vs API)
                   const id = record.id || record.code || 'N/D';
-                  const nomeCrianca = record.nomeCrianca || record.individualChild?.fullName;
-                  const sexo = record.sexo || (record.individualChild?.gender === 'MALE' ? 'M' : 'F');
-                  const nomeMae = record.nomeMae || record.mother?.fullName;
-                  const nomePai = record.nomePai || record.father?.fullName || 'Não Declarado';
-                  const local = record.naturalDe || record.placeOfBirth || 'Hospital';
-                  const dataNasc = record.dataNascimento || record.individualChild?.birthDate?.split('T')[0];
-                  const horaNasc = record.horaNascimento || record.individualChild?.birthDate?.split('T')[1]?.substring(0,5) || '00:00';
+                  
+                  const childObj = record.individual || record.individualChild;
+                  const motherObj = record.mother?.individual || record.mother;
+                  const fatherObj = record.father?.individual || record.father;
+
+                  const nomeCrianca = childObj?.fullName || record.nomeCrianca || 'Sem Nome';
+                  const rawGender = childObj?.gender || record.sexo;
+                  const sexo = (rawGender === 'MALE' || rawGender === 'M') ? 'M' : 'F';
+                  
+                  const nomeMae = motherObj?.fullName || record.nomeMae || 'N/D';
+                  const nomePai = (fatherObj?.fullName || record.nomePai) ? (fatherObj?.fullName || record.nomePai) : 'Não Declarado';
+                  
+                  const local = record.unity?.name || record.placeOfBirth || record.naturalDe || 'Hospital';
+
+                  // Extração segura da Data e Hora
+                  const rawDate = childObj?.birthDate || record.dataNascimento;
+                  let dataNasc = 'N/D';
+                  let horaNasc = '00:00';
+                  
+                  if (rawDate) {
+                    dataNasc = rawDate.split('T')[0];
+                    if (rawDate.includes('T')) {
+                      horaNasc = rawDate.split('T')[1].substring(0, 5);
+                    } else if (record.horaNascimento) {
+                      horaNasc = record.horaNascimento;
+                    }
+                  }
 
                   return (
                     <tr key={id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-mono font-bold text-slate-600 text-xs">{id.substring(0, 15)}</td>
+                      <td className="px-6 py-4 font-mono font-bold text-slate-600 text-xs">
+                        {id !== 'N/D' ? `${id.substring(0, 13)}...` : 'N/D'}
+                      </td>
                       <td className="px-6 py-4">
                         <div className="font-semibold text-slate-800">{nomeCrianca}</div>
                         <div className="text-xs text-slate-400 font-medium">{sexo === 'M' ? 'Masculino' : 'Feminino'}</div>
@@ -116,7 +145,7 @@ export default function RecemNascidosPage() {
                       <td className="px-6 py-4 text-xs space-y-0.5">
                         <div><span className="font-semibold text-slate-400">Mãe:</span> {nomeMae}</div>
                         <div><span className="font-semibold text-slate-400">Pai:</span> {nomePai}</div>
-                        <div className="text-[11px] text-blue-600 italic font-medium">{local}</div>
+                        <div className="text-[11px] text-blue-600 font-bold uppercase tracking-wider">{local}</div>
                       </td>
                       <td className="px-6 py-4 text-xs text-slate-600 font-medium">
                         <div>{dataNasc}</div>
@@ -124,9 +153,9 @@ export default function RecemNascidosPage() {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          record.status === 'pendente' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                          (record.status === 'pendente' || !record.id) ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
                         }`}>
-                          {record.status === 'pendente' ? 'Pendente' : 'Sinc'}
+                          {(record.status === 'pendente' || !record.id) ? 'Pendente' : 'Sinc'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -139,7 +168,9 @@ export default function RecemNascidosPage() {
                           </button>
                           <button
                             onClick={async () => {
-                              await logAction('Reimpressão de PDF', `Segunda via emitida para ID: ${id}`);
+                              if (logAction) {
+                                await logAction('Reimpressão de PDF', `Segunda via emitida para ID: ${id}`);
+                              }
                               generateAssentoPDF({ id, nomeCrianca, dataNascimento: dataNasc, horaNascimento: horaNasc, sexo, nomeMae, nomePai, naturalDe: local, municipio: '', provincia: '' });
                             }}
                             className="text-blue-600 hover:text-blue-800 text-xs font-bold bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
