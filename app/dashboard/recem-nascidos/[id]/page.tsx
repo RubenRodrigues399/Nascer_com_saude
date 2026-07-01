@@ -49,19 +49,24 @@ export default function ChildDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await newbornService.getChildById(id);
-        if (res.success) setChild(res.data);
-        else setPageError('Registo não encontrado.');
-      } catch {
-        setPageError('Erro ao carregar os dados do registo.');
-      } finally {
-        setLoading(false);
+
+    // Usar dados em cache da lista enquanto carrega da API
+    try {
+      const cached = sessionStorage.getItem('dnirn_child_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.id === id) {
+          setChild(parsed);
+          setLoading(false);
+        }
       }
-    };
-    load();
+    } catch {}
+
+    // Tentar obter dados frescos da API
+    newbornService.getChildById(id)
+      .then(res => { if (res.success && res.data) setChild(res.data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => {

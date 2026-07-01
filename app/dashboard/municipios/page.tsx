@@ -106,7 +106,6 @@ export default function MunicipiosPage() {
     try {
       const res = await locationsService.updateMunicipality(editingMuni.id, {
         name: editMuniName.trim(),
-        provinceId: editingMuni.provinceId,
       });
       if (res.success) {
         setEditingMuni(null);

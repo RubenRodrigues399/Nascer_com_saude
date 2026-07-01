@@ -133,6 +133,16 @@ const handleLogin = async (e: React.FormEvent) => {
             {isSubmitting ? 'A verificar...' : 'Entrar no Sistema'}
           </button>
 
+          <div className="text-center pt-1">
+            <button
+              type="button"
+              onClick={() => router.push('/recover-password')}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline underline-offset-2"
+            >
+              Esqueceu a palavra-passe?
+            </button>
+          </div>
+
         </form>
       </div>
     </div>

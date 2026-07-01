@@ -92,7 +92,7 @@ export const locationsService = {
   },
 
   /** Editar dados de um Município */
-  updateMunicipality: async (municipalityId: number, data: { name: string; provinceId: number }): Promise<ApiResponse<Municipality>> => {
+  updateMunicipality: async (municipalityId: number, data: { name: string }): Promise<ApiResponse<Municipality>> => {
     const response = await api.patch(`/dnirn/municipalities/${municipalityId}`, data);
     return response.data;
   },

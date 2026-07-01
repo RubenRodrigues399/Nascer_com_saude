@@ -8,7 +8,6 @@ import { api } from '@/app/services/api';
 export interface ChildIndividualInput {
   fullName: string;
   gender: 'MALE' | 'FEMALE';
-  identificationNumber: string; // pode ser string vazia para recém-nascidos
   birthDate: string; // YYYY-MM-DD ou YYYY-MM-DDTHH:mm:ss
 }
 
@@ -43,7 +42,7 @@ export interface CreateChildDto {
   professionalSupport: boolean;
   unityId: number;
   mother: ParentInput;
-  father?: ParentInput | null;
+  father?: ParentInput;
   witness?: WitnessInput[];
 }
 
@@ -53,7 +52,6 @@ export interface UpdateChildDto {
   individual: {
     fullName: string;
     gender: 'MALE' | 'FEMALE';
-    identificationNumber: string;
     birthDate: string;
   };
   height: number;
@@ -175,6 +173,12 @@ export const newbornService = {
   /** Rota: POST /dnirn/child/addFather */
   addFather: async (payload: AddFatherDto): Promise<ApiResponse<ChildRecord>> => {
     const response = await api.post('/dnirn/child/addFather', payload);
+    return response.data;
+  },
+
+  /** Rota: GET /dnirn/child/childByDNV/{dnv} */
+  getChildByDNV: async (dnv: string): Promise<ApiResponse<ChildRecord>> => {
+    const response = await api.get(`/dnirn/child/childByDNV/${dnv}`);
     return response.data;
   },
 
