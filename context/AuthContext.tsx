@@ -14,7 +14,10 @@ import { authService, LoginResponseData } from "@/app/services/auth";
 import { onActivity } from "@/utils/activityTracker";
 
 // Tempo máximo sem qualquer atividade (ecrã ou pedidos ao servidor) antes do logout automático
-const INACTIVITY_LIMIT_MS = 15 * 60 * 1000; // 15 minutos
+const INACTIVITY_LIMIT_MS = 10 * 60 * 1000; // 10 minutos
+// Quantos segundos antes do fim do prazo é mostrado o aviso "ainda está aí?"
+const IDLE_WARNING_SECONDS = 30;
+const IDLE_WARNING_MS = IDLE_WARNING_SECONDS * 1000;
 
 // Modelo de sessão rica estruturado a partir do Swagger
 interface UserSession {
@@ -38,6 +41,9 @@ interface AuthContextType {
     pin: string,
   ) => Promise<{ success: boolean; message: string; user?: UserSession }>;
   logout: () => void;
+  idleWarningOpen: boolean;
+  idleSecondsLeft: number;
+  keepSessionAlive: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -88,25 +94,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [logout]);
 
   // Logout automático por inatividade — segurança do posto de trabalho (DNIRN)
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [idleWarningOpen, setIdleWarningOpen] = useState(false);
+  const [idleSecondsLeft, setIdleSecondsLeft] = useState(IDLE_WARNING_SECONDS);
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastActivityRef = useRef(0);
+  const idleWarningOpenRef = useRef(false);
 
+  useEffect(() => {
+    idleWarningOpenRef.current = idleWarningOpen;
+  }, [idleWarningOpen]);
+
+  const clearIdleTimers = useCallback(() => {
+    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+  }, []);
+
+  // Reinicia o cronómetro: agenda o aviso para (limite - 30s) e só aí começa a contagem decrescente
   const resetIdleTimer = useCallback(() => {
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => {
-      sessionStorage.setItem("dnirn_idle_logout", "1");
-      logout();
-    }, INACTIVITY_LIMIT_MS);
-  }, [logout]);
+    clearIdleTimers();
+    setIdleWarningOpen(false);
+    setIdleSecondsLeft(IDLE_WARNING_SECONDS);
+
+    warningTimerRef.current = setTimeout(() => {
+      setIdleWarningOpen(true);
+      setIdleSecondsLeft(IDLE_WARNING_SECONDS);
+
+      countdownIntervalRef.current = setInterval(() => {
+        setIdleSecondsLeft((seconds) => {
+          if (seconds <= 1) {
+            if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+            sessionStorage.setItem("dnirn_idle_logout", "1");
+            logout();
+            return 0;
+          }
+          return seconds - 1;
+        });
+      }, 1000);
+    }, INACTIVITY_LIMIT_MS - IDLE_WARNING_MS);
+  }, [clearIdleTimers, logout]);
+
+  // Chamado pelo botão "Continuar sessão" do aviso — conta como atividade explícita
+  const keepSessionAlive = useCallback(() => {
+    resetIdleTimer();
+  }, [resetIdleTimer]);
 
   useEffect(() => {
     if (!user) {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      clearIdleTimers();
+      setIdleWarningOpen(false);
       return;
     }
 
     const THROTTLE_MS = 1000; // evita reiniciar o cronómetro em cada pixel de rato
     const registerActivity = () => {
+      // Enquanto o aviso estiver visível, só a ação explícita do botão conta como "continuar"
+      if (idleWarningOpenRef.current) return;
       const now = Date.now();
       if (now - lastActivityRef.current < THROTTLE_MS) return;
       lastActivityRef.current = now;
@@ -124,9 +167,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       domEvents.forEach((ev) => window.removeEventListener(ev, registerActivity));
       unsubscribeApiActivity();
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      clearIdleTimers();
     };
-  }, [user, resetIdleTimer]);
+  }, [user, resetIdleTimer, clearIdleTimers]);
 
   // Função central de autenticação com contingência e contratos estritos
   const login = async (phoneNumber: string, pin: string) => {
@@ -204,7 +247,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated: !!user, login, logout, loading }}
+      value={{
+        user,
+        isAuthenticated: !!user,
+        login,
+        logout,
+        loading,
+        idleWarningOpen,
+        idleSecondsLeft,
+        keepSessionAlive,
+      }}
     >
       {children}
     </AuthContext.Provider>
