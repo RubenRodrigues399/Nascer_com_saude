@@ -196,7 +196,7 @@ export default function ContaPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto ">
       <div className="mb-6">
         <h1 className="text-2xl font-black text-slate-800 tracking-tight">Conta e Segurança</h1>
         <p className="text-slate-500 text-sm mt-1">
