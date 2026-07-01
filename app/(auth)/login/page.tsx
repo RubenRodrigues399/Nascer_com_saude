@@ -22,6 +22,14 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
+  // Avisa o utilizador quando chega aqui por ter sido desligado por inatividade
+  useEffect(() => {
+    if (sessionStorage.getItem('dnirn_idle_logout')) {
+      sessionStorage.removeItem('dnirn_idle_logout');
+      setError('Sessão terminada automaticamente por inatividade. Inicie sessão novamente.');
+    }
+  }, []);
+
 const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

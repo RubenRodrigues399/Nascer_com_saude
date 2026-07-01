@@ -6,10 +6,15 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/db";
 import { authService, LoginResponseData } from "@/app/services/auth";
+import { onActivity } from "@/utils/activityTracker";
+
+// Tempo máximo sem qualquer atividade (ecrã ou pedidos ao servidor) antes do logout automático
+const INACTIVITY_LIMIT_MS = 15 * 60 * 1000; // 15 minutos
 
 // Modelo de sessão rica estruturado a partir do Swagger
 interface UserSession {
@@ -42,26 +47,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Limpeza absoluta da sessão ao sair ou expirar
- const logout = useCallback(async () => {
-  try {
+  // Limpeza absoluta da sessão ao sair ou expirar.
+  // A sessão local é sempre terminada, mesmo que o servidor esteja offline ou recuse o pedido —
+  // a segurança do posto de trabalho não pode depender de uma confirmação de rede.
+  const logout = useCallback(async () => {
     const savedSession = sessionStorage.getItem("dnirn_session");
-    if (savedSession && navigator.onLine) {
-      const { tokenAccess } = JSON.parse(savedSession);
-      
-      // Envia o pedido
-      await authService.logout(tokenAccess);
-      
-      // SÓ LIMPA LOCALMENTE SE O SERVIDOR CONFIRMAR
+    try {
+      if (savedSession && navigator.onLine) {
+        const { tokenAccess } = JSON.parse(savedSession);
+        await authService.logout(tokenAccess);
+      }
+    } catch (e) {
+      console.error('Aviso: não foi possível confirmar o logout junto do servidor. A sessão local será encerrada na mesma.', e);
+    } finally {
       sessionStorage.removeItem("dnirn_session");
       setUser(null);
       router.push("/login");
     }
-  } catch (e) {
-    console.error('Erro crítico: O servidor recusou o logout. Sessão presa.', e);
-    // Mostra um aviso ao utilizador: "Não foi possível encerrar a sessão no servidor de forma segura."
-  }
-}, [router]);
+  }, [router]);
 
   // Recupera a sessão guardada ao iniciar a App e valida expiração do Refresh Token (24 horas)
   useEffect(() => {
@@ -83,6 +86,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setLoading(false);
   }, [logout]);
+
+  // Logout automático por inatividade — segurança do posto de trabalho (DNIRN)
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastActivityRef = useRef(0);
+
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      sessionStorage.setItem("dnirn_idle_logout", "1");
+      logout();
+    }, INACTIVITY_LIMIT_MS);
+  }, [logout]);
+
+  useEffect(() => {
+    if (!user) {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      return;
+    }
+
+    const THROTTLE_MS = 1000; // evita reiniciar o cronómetro em cada pixel de rato
+    const registerActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityRef.current < THROTTLE_MS) return;
+      lastActivityRef.current = now;
+      resetIdleTimer();
+    };
+
+    const domEvents: (keyof WindowEventMap)[] = [
+      "mousemove", "mousedown", "keydown", "touchstart", "scroll", "wheel",
+    ];
+    domEvents.forEach((ev) => window.addEventListener(ev, registerActivity, { passive: true }));
+    const unsubscribeApiActivity = onActivity(registerActivity);
+
+    resetIdleTimer(); // arranca o cronómetro assim que a sessão fica ativa
+
+    return () => {
+      domEvents.forEach((ev) => window.removeEventListener(ev, registerActivity));
+      unsubscribeApiActivity();
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [user, resetIdleTimer]);
 
   // Função central de autenticação com contingência e contratos estritos
   const login = async (phoneNumber: string, pin: string) => {
