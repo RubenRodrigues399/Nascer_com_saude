@@ -56,7 +56,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="text-right hidden sm:block">
                   <div className="text-sm font-bold text-slate-100">{user.fullName}</div>
                   <div className="text-[10px] text-amber-400 font-mono uppercase tracking-wider font-semibold">
-                    {user.roleProfessional === 'administrador' ? 'Super Administrador' : user.roleProfessional}
+                    {user.roleProfessional === 'ADMINISTRATIVE_SUPER' ? 'Super Administrador' : user.roleProfessional}
                   </div>
                 </div>
               )}

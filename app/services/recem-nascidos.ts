@@ -1,28 +1,57 @@
 import { api } from '@/app/services/api';
 
-export interface NewbornRecord {
-  id?: string;
-  nomeCrianca: string;
-  sexo: string;
-  dataNascimento: string;
-  horaNascimento: string;
-  nomeMae: string;
-  biMae: string;
-  nomePai?: string;
-  biPai?: string;
-  naturalDe: string;
-  municipio: string;
-  provincia: string;
-  status: 'pendente' | 'sincronizado';
+// ============================================================================
+// INTERFACES / TIPOS — CRIANÇAS
+// ============================================================================
+
+// Payload do filho para POST /dnirn/child
+export interface ChildIndividualInput {
+  fullName: string;
+  gender: 'MALE' | 'FEMALE';
+  birthDate: string; // YYYY-MM-DD ou YYYY-MM-DDTHH:mm:ss
 }
 
-// DTOs baseados nos schemas do Swagger
-export interface ChildUpdateDTO {
+// Payload do progenitor (mãe / pai) para criação
+export interface ParentInput {
+  fullName: string;
+  phoneNumber: string;
+  identificationDocument: {
+    type: 'BI' | 'PASSAPORT' | 'DNV';
+    number: string;
+    expirationDate: string; // YYYY-MM-DD
+  };
+  birthDate: string; // YYYY-MM-DD
+  municipalityId: number;
+  neighborhoodName: string;
+}
+
+export interface WitnessInput {
+  parent: ParentInput;
+  gender: 'MALE' | 'FEMALE';
+}
+
+// POST /dnirn/child
+export interface CreateChildDto {
+  individualChild: ChildIndividualInput;
+  height: number;
+  weight: number;
+  vitalStatus: 'ALIVE' | 'DECEASED';
+  deathDate?: string; // YYYY-MM-DD — só quando DECEASED
+  gestacionalAge: { weeks: number; days: number };
+  placeOfBirth: 'HOSPITAL' | 'HOME' | 'OTHER';
+  professionalSupport: boolean;
+  unityId: number;
+  mother: ParentInput;
+  father?: ParentInput;
+  witness?: WitnessInput[];
+}
+
+// PUT /dnirn/child
+export interface UpdateChildDto {
   id: string;
   individual: {
     fullName: string;
     gender: 'MALE' | 'FEMALE';
-    identificationNumber: string;
     birthDate: string;
   };
   height: number;
@@ -36,86 +65,126 @@ export interface ChildUpdateDTO {
   neighborhoodName: string;
 }
 
-export interface AddFatherDTO {
+// POST /dnirn/child/addFather
+export interface AddFatherDto {
   childId: string;
-  father: {
+  father: ParentInput;
+}
+
+// ============================================================================
+// TIPOS DE RESPOSTA — o que a API devolve
+// ============================================================================
+
+export interface FamilyMemberSummary {
+  id: string;
+  familyEnum: string;
+  individual: {
+    id: string;
     fullName: string;
-    phoneNumber: string;
+    gender: 'MALE' | 'FEMALE';
     identificationDocument: {
-      type: 'BI' | 'PASSAPORT' | 'DNV';
-      number: string;
-      expirationDate: string;
+      typeDocument: 'BI' | 'PASSAPORT' | 'DNV';
+      identificationNumber: string;
+      expirationDateDocument: string;
     };
-    birthDate: string;
-    municipalityId: number;
-    neighborhoodName: string;
   };
 }
 
-export const newbornService = {
-  getAllNewborns: async () => {
-    try {
-      const response = await api.get('/dnirn/child/all');
-      return { success: true, data: response.data.data || response.data };
-    } catch (error: any) {
-      return { success: false, message: error.message, data: [] };
-    }
-  },
-
-  getChildById: async (childId: string) => {
-    try {
-      const response = await api.get(`/dnirn/child/childById/${childId}`);
-      return { success: true, data: response.data.data || response.data };
-    } catch (error: any) {
-      return { success: false, message: error.response?.data?.message || error.message, data: null };
-    }
-  },
-
-  getChildrenByUnity: async (unityId: number) => {
-    try {
-      const response = await api.get(`/dnirn/child/byUnity/${unityId}`);
-      return { success: true, data: response.data.data || response.data };
-    } catch (error: any) {
-      return { success: false, message: error.message, data: [] };
-    }
-  },
-
-  createChild: async (payload: any) => {
-    try {
-      const response = await api.post('/dnirn/child', payload);
-      return { success: true, data: response.data };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: error.response?.data?.message || error.message
+export interface ChildRecord {
+  id: string;
+  individual: {
+    id: string;
+    fullName: string;
+    gender: 'MALE' | 'FEMALE';
+    identificationDocument: {
+      typeDocument: 'BI' | 'PASSAPORT' | 'DNV';
+      identificationNumber: string;
+      expirationDateDocument: string;
+    };
+    birthDate: string;
+    neighborhood?: {
+      id: number;
+      name: string;
+      municipality?: {
+        id: number;
+        name: string;
+        province?: { id: number; name: string };
       };
-    }
+    };
+    createdAt: string;
+    updatedAt: string;
+  };
+  height: number;
+  weight: number;
+  vitalStatus: 'ALIVE' | 'DECEASED';
+  deathDate?: string;
+  gestacionalAge: { weeks: number; days: number };
+  placeOfBirth: 'HOSPITAL' | 'HOME' | 'OTHER';
+  professionalSupport: boolean;
+  unity?: { id: number; name: string; nif?: string };
+  mother?: FamilyMemberSummary;
+  father?: FamilyMemberSummary;
+  witness?: FamilyMemberSummary[];
+}
+
+interface ApiResponse<T> {
+  status: number;
+  success: boolean;
+  error: string | null;
+  message: string;
+  data: T;
+}
+
+// ============================================================================
+// MÉTODOS DE CONSUMO DA API — CRIANÇAS
+// ============================================================================
+export const newbornService = {
+
+  /** Rota: GET /dnirn/child/all */
+  getAllNewborns: async (): Promise<ApiResponse<ChildRecord[]>> => {
+    const response = await api.get('/dnirn/child/all');
+    return response.data;
   },
 
-  updateChild: async (payload: ChildUpdateDTO) => {
-    try {
-      const response = await api.put('/dnirn/child', payload);
-      return { success: true, data: response.data.data || response.data };
-    } catch (error: any) {
-      return { success: false, message: error.response?.data?.message || error.message };
-    }
+  /** Rota: GET /dnirn/child/childById/{childId} */
+  getChildById: async (childId: string): Promise<ApiResponse<ChildRecord>> => {
+    const response = await api.get(`/dnirn/child/childById/${childId}`);
+    return response.data;
   },
 
-  addFather: async (payload: AddFatherDTO) => {
-    try {
-      const response = await api.post('/dnirn/child/addFather', payload);
-      return { success: true, data: response.data.data || response.data };
-    } catch (error: any) {
-      return { success: false, message: error.response?.data?.message || error.message };
-    }
+  /** Rota: GET /dnirn/child/byUnity/{unityId} */
+  getChildrenByUnity: async (unityId: number): Promise<ApiResponse<ChildRecord[]>> => {
+    const response = await api.get(`/dnirn/child/byUnity/${unityId}`);
+    return response.data;
   },
 
-  deleteChild: async (id: string) => {
-    try {
-      const response = await api.delete(`/dnirn/child/${id}`);
-      return { success: true, data: response.data };
-    } catch (error: any) {
-      return { success: false, message: error.response?.data?.message || error.message };
-    }
-  }
+  /** Rota: POST /dnirn/child */
+  createChild: async (payload: CreateChildDto): Promise<ApiResponse<ChildRecord>> => {
+    const response = await api.post('/dnirn/child', payload);
+    return response.data;
+  },
+
+  /** Rota: PUT /dnirn/child */
+  updateChild: async (payload: UpdateChildDto): Promise<ApiResponse<ChildRecord>> => {
+    const response = await api.put('/dnirn/child', payload);
+    return response.data;
+  },
+
+  /** Rota: POST /dnirn/child/addFather */
+  addFather: async (payload: AddFatherDto): Promise<ApiResponse<ChildRecord>> => {
+    const response = await api.post('/dnirn/child/addFather', payload);
+    return response.data;
+  },
+
+  /** Rota: GET /dnirn/child/childByDNV/{dnv} */
+  getChildByDNV: async (dnv: string): Promise<ApiResponse<ChildRecord>> => {
+    const response = await api.get(`/dnirn/child/childByDNV/${dnv}`);
+    return response.data;
+  },
+
+  /** Rota: DELETE /dnirn/child/{id} */
+  deleteChild: async (id: string): Promise<ApiResponse<void>> => {
+    const response = await api.delete(`/dnirn/child/${id}`);
+    return response.data;
+  },
 };

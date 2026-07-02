@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { professionalsService } from '@/app/services/profissionais';
+import { professionalsService, CreateProfessionalDto, CreateSuperProfessionalDto } from '@/app/services/profissionais';
 import { locationsService, Province, Municipality, Neighborhood } from '@/app/services/locations';
+import { unityService, UnityRecord } from '@/app/services/unidades';
 import { useAuth } from '@/context/AuthContext';
 
 type Role = 'TECHNICAL' | 'ADMINISTRATIVE' | 'ADMINISTRATIVE_SUPER';
@@ -26,6 +27,10 @@ export default function CreateProfessionalPage() {
   const [docNumber, setDocNumber] = useState('');
   const [docExpiry, setDocExpiry] = useState('');
 
+  // Unidades
+  const [unities, setUnities] = useState<UnityRecord[]>([]);
+  const [selectedUnityId, setSelectedUnityId] = useState<string>('');
+
   // Cascata territorial
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
@@ -35,6 +40,26 @@ export default function CreateProfessionalPage() {
   const [selectedBairroId, setSelectedBairroId] = useState('');
 
   const isSuper = role === 'ADMINISTRATIVE_SUPER';
+  const canCreateSuper = user?.roleProfessional === 'ADMINISTRATIVE_SUPER';
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await unityService.getAllUnities();
+        if (res.success && Array.isArray(res.data)) {
+          setUnities(res.data);
+        }
+      } catch { /* silent */ }
+    };
+    load();
+  }, []);
+
+  // Pré-selecionar a unidade do utilizador logado assim que as unidades carregarem
+  useEffect(() => {
+    if (user?.unityId && unities.length > 0 && !selectedUnityId) {
+      setSelectedUnityId(String(user.unityId));
+    }
+  }, [user?.unityId, unities]);
 
   useEffect(() => {
     const load = async () => {
@@ -87,6 +112,10 @@ export default function CreateProfessionalPage() {
     e.preventDefault();
     setError('');
 
+    if (!isSuper && !selectedUnityId) {
+      setError('Seleccione a unidade hospitalar.');
+      return;
+    }
     if (!selectedMuniId || !selectedBairroId) {
       setError('Seleccione a localização completa: município e bairro.');
       return;
@@ -100,13 +129,15 @@ export default function CreateProfessionalPage() {
 
     const bairroSelecionado = bairros.find(b => b.id === Number(selectedBairroId));
 
-    const individualPayload = {
+    const municipalityId = Number(selectedMuniId);
+
+    const individualPayload: CreateProfessionalDto['individual'] = {
       fullName: fullName.trim(),
       gender,
       birthDate,
-      role: 'PROFESSIONAL' as const,
-      municipalityId: Number(selectedMuniId),
+      municipalityId,
       neighborhoodName: bairroSelecionado?.name ?? '',
+      role: 'PROFESSIONAL',
       identificationDocument: {
         type: docType,
         number: docNumber.trim().toUpperCase(),
@@ -118,22 +149,20 @@ export default function CreateProfessionalPage() {
       let response;
 
       if (isSuper) {
-        // ProfessionalSuperCreateRequest — apenas individual + phoneNumber
-        const superPayload = {
+        const superPayload: CreateSuperProfessionalDto = {
           phoneNumber: phoneNumber.trim(),
           individual: individualPayload,
         };
-        response = await professionalsService.createSuperProfessional(superPayload as any);
+        response = await professionalsService.createSuperProfessional(superPayload);
       } else {
-        // ProfessionalCreateRequest — payload completo com unityId da sessão
-        const regularPayload = {
-          roleProfessional: role,
-          idUnity: user?.unityId ?? 1,
-          phoneNumber: phoneNumber.trim(),
-          municipalityId: Number(selectedMuniId),
+        const regularPayload: CreateProfessionalDto = {
           individual: individualPayload,
+          phoneNumber: phoneNumber.trim(),
+          roleProfessional: role,
+          municipalityId,
+          idUnity: Number(selectedUnityId),
         };
-        response = await professionalsService.createProfessional(regularPayload as any);
+        response = await professionalsService.createProfessional(regularPayload);
       }
 
       if (response.success) {
@@ -177,9 +206,11 @@ export default function CreateProfessionalPage() {
               value={role} onChange={e => setRole(e.target.value as Role)}
               className="w-full p-2.5 border border-slate-300 bg-white rounded-xl text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
             >
-              <option value="TECHNICAL">Técnico de Registo (TECHNICAL)</option>
-              <option value="ADMINISTRATIVE">Supervisor Local (ADMINISTRATIVE)</option>
-              <option value="ADMINISTRATIVE_SUPER">Super Administrador (ADMINISTRATIVE_SUPER)</option>
+              <option value="TECHNICAL">Técnico de Registo</option>
+              <option value="ADMINISTRATIVE">Supervisor Local</option>
+              {canCreateSuper && (
+                <option value="ADMINISTRATIVE_SUPER">Super Administrador</option>
+              )}
             </select>
             {isSuper && (
               <p className="text-[10px] text-amber-600 font-semibold mt-1">
@@ -268,15 +299,21 @@ export default function CreateProfessionalPage() {
           </div>
 
           {/* Unidade (apenas para não-super) */}
-          {!isSuper && user?.unityId && (
-            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-              <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              <div>
-                <p className="text-[10px] font-black text-blue-700 uppercase tracking-wide">Unidade atribuída automaticamente</p>
-                <p className="text-xs text-blue-800 font-semibold">{user.unityName} <span className="font-mono text-blue-500">(ID: {user.unityId})</span></p>
-              </div>
+          {!isSuper && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 tracking-wide">Unidade Hospitalar *</label>
+              <select
+                required
+                value={selectedUnityId}
+                onChange={e => setSelectedUnityId(e.target.value)}
+                disabled={loading || unities.length === 0}
+                className="w-full p-2.5 border border-slate-300 bg-white disabled:bg-slate-100 rounded-xl text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+              >
+                <option value="">{unities.length === 0 ? 'A carregar...' : '-- Escolha a Unidade --'}</option>
+                {unities.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
             </div>
           )}
 

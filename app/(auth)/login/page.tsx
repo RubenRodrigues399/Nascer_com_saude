@@ -22,6 +22,14 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
+  // Avisa o utilizador quando chega aqui por ter sido desligado por inatividade
+  useEffect(() => {
+    if (sessionStorage.getItem('dnirn_idle_logout')) {
+      sessionStorage.removeItem('dnirn_idle_logout');
+      setError('Sessão terminada automaticamente por inatividade. Inicie sessão novamente.');
+    }
+  }, []);
+
 const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -132,6 +140,16 @@ const handleLogin = async (e: React.FormEvent) => {
           >
             {isSubmitting ? 'A verificar...' : 'Entrar no Sistema'}
           </button>
+
+          <div className="text-center pt-1">
+            <button
+              type="button"
+              onClick={() => router.push('/recover-password')}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline underline-offset-2"
+            >
+              Esqueceu a palavra-passe?
+            </button>
+          </div>
 
         </form>
       </div>

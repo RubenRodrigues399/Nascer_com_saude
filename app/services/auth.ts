@@ -52,6 +52,7 @@ export interface LoginResponseData {
   tokenAccess: string;
   tokenRefresh: string;
   individual: IndividualData;
+  unity?: { id: number; name: string } | null;
 }
 
 interface ApiResponse<T> {

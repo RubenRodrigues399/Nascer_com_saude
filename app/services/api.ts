@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { authService } from './auth';
+import { pingActivity } from '@/utils/activityTracker';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-registro-civil-ixfv.onrender.com';
 const API_KEY = process.env.NEXT_PUBLIC_DNIRN_API_KEY || 'dnirn00.@gmail.com';
@@ -15,6 +16,7 @@ export const api = axios.create({
 // INTERCEPTOR DE REQUEST: Injeta o Token de Acesso se ele existir
 api.interceptors.request.use(
   (config) => {
+    pingActivity();
     if (typeof window !== 'undefined') {
       const session = sessionStorage.getItem('dnirn_session');
       if (session) {

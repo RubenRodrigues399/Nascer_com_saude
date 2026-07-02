@@ -4,13 +4,35 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { professionalsService, ProfessionalRecord } from '@/app/services/profissionais';
 
+type SearchMode = 'all' | 'phone' | 'id' | 'verify';
+
+const roleLabel: Record<string, string> = {
+  ADMINISTRATIVE: 'Supervisor Local',
+  TECHNICAL: 'Técnico de Registo',
+  ADMINISTRATIVE_SUPER: 'Super Admin',
+};
+
+const roleBadge: Record<string, string> = {
+  ADMINISTRATIVE: 'bg-amber-50 text-amber-700 border-amber-200',
+  TECHNICAL: 'bg-blue-50 text-blue-700 border-blue-200',
+  ADMINISTRATIVE_SUPER: 'bg-violet-50 text-violet-700 border-violet-200',
+};
+
 export default function ProfessionalsListPage() {
   const router = useRouter();
-  const [professionals, setProfessionals] = useState<ProfessionalRecord[]>([]);
+
+  const [allProfessionals, setAllProfessionals] = useState<ProfessionalRecord[]>([]);
+  const [displayed, setDisplayed] = useState<ProfessionalRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
+
+  // Pesquisa
+  const [searchMode, setSearchMode] = useState<SearchMode>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchError, setSearchError] = useState('');
 
   // Confirmação de apagar
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -21,20 +43,60 @@ export default function ProfessionalsListPage() {
     setTimeout(() => isError ? setActionError('') : setActionMessage(''), 3500);
   };
 
-  const loadProfessionals = async () => {
+  const loadAll = async () => {
     try {
       setLoading(true);
-      const response = await professionalsService.getAllProfessionals();
-      if (response.success) setProfessionals(response.data);
-    } catch (err) {
-      console.error('Erro ao carregar profissionais:', err);
+      const res = await professionalsService.getAllProfessionals();
+      if (res.success) {
+        setAllProfessionals(res.data);
+        setDisplayed(res.data);
+      }
+    } catch {
       setError('Não foi possível carregar a lista de profissionais.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadProfessionals(); }, []);
+  useEffect(() => { loadAll(); }, []);
+
+  const handleModeChange = (mode: SearchMode) => {
+    setSearchMode(mode);
+    setSearchQuery('');
+    setSearchError('');
+    if (mode === 'all') setDisplayed(allProfessionals);
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchError('');
+    const q = searchQuery.trim();
+    if (!q) return;
+
+    setSearchLoading(true);
+    try {
+      let res;
+      if (searchMode === 'phone') {
+        res = await professionalsService.getProfessionalByPhone(q);
+      } else if (searchMode === 'id') {
+        res = await professionalsService.getProfessionalById(q);
+      } else if (searchMode === 'verify') {
+        res = await professionalsService.verifyPhoneNumberRecover(q);
+      }
+
+      if (res?.success && res.data) {
+        setDisplayed(Array.isArray(res.data) ? res.data : [res.data]);
+      } else {
+        setDisplayed([]);
+        setSearchError(res?.message || 'Nenhum profissional encontrado.');
+      }
+    } catch (err: any) {
+      setDisplayed([]);
+      setSearchError(err.response?.data?.message || 'Erro ao pesquisar. Tente novamente.');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
 
   const handleConfirmDelete = async () => {
     if (!confirmDeleteId) return;
@@ -43,7 +105,7 @@ export default function ProfessionalsListPage() {
       const res = await professionalsService.deleteProfessional(confirmDeleteId);
       if (res.success) {
         setConfirmDeleteId(null);
-        loadProfessionals();
+        loadAll();
         flash('Profissional eliminado com sucesso.');
       } else {
         flash(res.message || 'Erro ao eliminar.', true);
@@ -57,27 +119,22 @@ export default function ProfessionalsListPage() {
     }
   };
 
-  const roleLabel: Record<string, string> = {
-    ADMINISTRATIVE: 'Administrativo',
-    TECHNICAL: 'Técnico',
-    ADMINISTRATIVE_SUPER: 'Super Admin',
-  };
-
-  const roleBadge: Record<string, string> = {
-    ADMINISTRATIVE: 'bg-amber-50 text-amber-700 border-amber-200',
-    TECHNICAL: 'bg-blue-50 text-blue-700 border-blue-200',
-    ADMINISTRATIVE_SUPER: 'bg-violet-50 text-violet-700 border-violet-200',
-  };
-
   if (error) return <div className="p-6 text-rose-500 text-sm font-semibold">{error}</div>;
+
+  const searchModes: [SearchMode, string][] = [
+    ['all', 'Todos os Profissionais'],
+    ['phone', 'Pesquisar por Telemóvel'],
+    ['id', 'Pesquisar por ID'],
+  ];
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto p-2">
+
       {/* CABEÇALHO */}
       <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Profissionais</h1>
-          <p className="text-sm text-slate-500">Gestão de profissionais integrados na plataforma.</p>
+          <p className="text-sm text-slate-500">Gestão de profissionais integrados na plataforma DNIRN.</p>
         </div>
         <button
           onClick={() => router.push('/dashboard/profissionais/create')}
@@ -90,34 +147,99 @@ export default function ProfessionalsListPage() {
       {actionMessage && <div className="p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-xs rounded-lg font-bold">✓ {actionMessage}</div>}
       {actionError && <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold">{actionError}</div>}
 
-      {/* TABELA PRINCIPAL */}
+      {/* PAINEL DE PESQUISA */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+        <div className="flex gap-2 flex-wrap">
+          {searchModes.map(([mode, label]) => (
+            <button
+              key={mode}
+              onClick={() => handleModeChange(mode)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${
+                searchMode === mode
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {searchMode !== 'all' && (
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setSearchError(''); }}
+              placeholder={
+                searchMode === 'phone' || searchMode === 'verify'
+                  ? 'Ex: 921025087'
+                  : 'Ex: 3fa85f64-5717-...'
+              }
+              className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none font-mono"
+            />
+            <button
+              type="submit"
+              disabled={searchLoading || !searchQuery.trim()}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all"
+            >
+              {searchLoading ? 'A pesquisar...' : 'Pesquisar'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchQuery(''); setDisplayed(allProfessionals); setSearchError(''); }}
+              className="px-4 py-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50"
+            >
+              Limpar
+            </button>
+          </form>
+        )}
+
+        {searchMode === 'verify' && (
+          <p className="text-[11px] text-slate-400">
+            Verifica se o número está registado no sistema e elegível para recuperação de senha.
+          </p>
+        )}
+
+        {searchError && (
+          <div className="p-3 bg-amber-50 border-l-4 border-amber-400 text-amber-800 text-xs rounded-lg font-semibold">
+            {searchError}
+          </div>
+        )}
+      </div>
+
+      {/* TABELA */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
               <th className="p-4">Nome Completo</th>
               <th className="p-4">Cargo / Função</th>
-              <th className="p-4">Nº de Documento</th>
               <th className="p-4">Telemóvel</th>
+              <th className="p-4">Nº Documento</th>
+              <th className="p-4">Unidade</th>
               <th className="p-4 text-right">Acções</th>
             </tr>
           </thead>
           <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={5} className="p-8 text-center text-slate-400 animate-pulse">A carregar profissionais...</td></tr>
-            ) : professionals.length === 0 ? (
-              <tr><td colSpan={5} className="p-8 text-center text-slate-400">Nenhum profissional localizado na base central.</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-slate-400 animate-pulse">A carregar profissionais...</td></tr>
+            ) : displayed.length === 0 ? (
+              <tr><td colSpan={6} className="p-8 text-center text-slate-400">Nenhum profissional encontrado.</td></tr>
             ) : (
-              professionals.map((pro) => (
+              displayed.map((pro) => (
                 <tr key={pro.id} className="hover:bg-slate-50/60 transition-all">
-                  <td className="p-4 font-semibold text-slate-800">{pro.individual?.fullName}</td>
+                  <td className="p-4 font-semibold text-slate-800">{pro.individual?.fullName ?? 'N/D'}</td>
                   <td className="p-4">
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${roleBadge[pro.roleProfessional] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                      {roleLabel[pro.roleProfessional] || pro.roleProfessional}
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${roleBadge[pro.roleProfessional] ?? 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                      {roleLabel[pro.roleProfessional] ?? pro.roleProfessional}
                     </span>
                   </td>
-                  <td className="p-4 font-mono text-xs text-slate-600">{pro.individual?.identificationDocument?.identificationNumber || 'N/D'}</td>
-                  <td className="p-4 text-slate-600">{pro.individual?.phoneNumber || 'N/D'}</td>
+                  <td className="p-4 font-mono text-xs text-slate-600">{pro.individual?.phoneNumber ?? 'N/D'}</td>
+                  <td className="p-4 font-mono text-xs text-slate-600">
+                    {pro.individual?.identificationDocument?.identificationNumber ?? 'N/D'}
+                  </td>
+                  <td className="p-4 text-xs text-slate-500">{pro.unity?.name ?? 'N/D'}</td>
                   <td className="p-4">
                     <div className="flex justify-end">
                       <button
@@ -133,6 +255,9 @@ export default function ProfessionalsListPage() {
             )}
           </tbody>
         </table>
+        <div className="px-4 py-2 border-t border-slate-100 text-[11px] text-slate-400">
+          {displayed.length} profissional(ais) apresentado(s)
+        </div>
       </div>
 
       {/* CONFIRMAÇÃO DE APAGAR */}

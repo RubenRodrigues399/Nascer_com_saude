@@ -1,40 +1,58 @@
 //Gestão de funcionários/profissionais
 
 import { api } from './api';
-import { IndividualData, IdentificationDocument } from './auth';
+import { IndividualData } from './auth';
 
 // ============================================================================
 // INTERFACES / TIPOS PARA GESTÃO DE PROFISSIONAIS
 // ============================================================================
 
-// Payload necessário para registar um profissional comum
+export interface IdentificationDocumentInput {
+  type: 'BI' | 'PASSAPORT' | 'DNV';
+  number: string;
+  expirationDate: string; // YYYY-MM-DD
+}
+
+export interface ProfessionalIndividualInput {
+  fullName: string;
+  gender: 'MALE' | 'FEMALE';
+  identificationDocument: IdentificationDocumentInput;
+  birthDate: string; // YYYY-MM-DD
+  municipalityId: number;
+  neighborhoodName: string;
+  role: 'PROFESSIONAL'; // obrigatório pela API
+}
+
+// POST /dnirn/professionals
 export interface CreateProfessionalDto {
+  individual: ProfessionalIndividualInput;
+  phoneNumber: string;
   roleProfessional: 'ADMINISTRATIVE' | 'TECHNICAL' | 'ADMINISTRATIVE_SUPER';
-  unityId: number;
-  individual: {
-    fullName: string;
-    gender: 'MALE' | 'FEMALE';
-    birthDate: string; // Formato YYYY-MM-DD
-    phoneNumber: string;
-    neighborhoodId: number;
-    identificationDocument: IdentificationDocument;
-  };
+  municipalityId: number; // obrigatório também na raiz
+  idUnity: number;
 }
 
-// Payload necessário para registar um Super Profissional
-export interface CreateSuperProfessionalDto extends Omit<CreateProfessionalDto, 'roleProfessional'> {
-  roleProfessional: 'ADMINISTRATIVE' | 'TECHNICAL' | 'ADMINISTRATIVE_SUPER'; 
+// POST /dnirn/professionals/super
+export interface CreateSuperProfessionalDto {
+  individual: ProfessionalIndividualInput;
+  phoneNumber: string;
 }
 
-// Modelo estrutural de como o profissional é retornado na listagem da API
+// Modelo estrutural de como o profissional é retornado pela API
 export interface ProfessionalRecord {
   id: string;
   roleProfessional: 'ADMINISTRATIVE' | 'TECHNICAL' | 'ADMINISTRATIVE_SUPER';
-  unityId: number;
-  createdAt: string;
-  updatedAt: string;
-  deleted: boolean;
-  individual: IndividualData; 
+  individual: IndividualData;
+  unity?: {
+    id: number;
+    name: string;
+    nif?: string;
+    phoneNumber?: string;
+    email?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+  deleted?: boolean;
 }
 
 interface ApiResponse<T> {
@@ -50,12 +68,7 @@ interface ApiResponse<T> {
 // ============================================================================
 export const professionalsService = {
 
-  /** * Registar um novo profissional associado a uma unidade/maternidade específica
-   * Rota: POST /dnirn/professionals
-   */
-  /** * Registar um novo profissional associado a uma unidade/maternidade específica
-   * Rota: POST /dnirn/professionals
-   */
+  /** Rota: POST /dnirn/professionals (ou /super para ADMINISTRATIVE_SUPER) */
  createProfessional: async (data: CreateProfessionalDto): Promise<ApiResponse<ProfessionalRecord>> => {
     let token = '';
     let isSuperUser = false;
@@ -83,9 +96,9 @@ export const professionalsService = {
 
     const API_KEY = process.env.NEXT_PUBLIC_DNIRN_API_KEY || 'dnirn00.@gmail.com';
 
-    const payload = {
+    const payload: CreateProfessionalDto = {
       ...data,
-      unityId: userUnityId
+      idUnity: data.idUnity || userUnityId, // data.idUnity sobrepõe; cai para a sessão só se vier vazio
     };
 
     // DEFINIÇÃO DINÂMICA DA ROTA: Se for super, aponta para /super, senão vai para a rota comum
@@ -111,33 +124,31 @@ export const professionalsService = {
     return response.data;
   },
 
-  /** * Listar todos os profissionais registados na base central da DNIRN
-   * Rota: GET /dnirn/professionals/all
-   */
+  /** Rota: GET /dnirn/professionals/all */
   getAllProfessionals: async (): Promise<ApiResponse<ProfessionalRecord[]>> => {
     const response = await api.get('/dnirn/professionals/all');
     return response.data;
   },
 
-  /** * Obter o perfil detalhado de um funcionário específico através do seu ID
-   * Rota: GET /dnirn/professionals/{professionalId}
-   */
+  /** Rota: GET /dnirn/professionals/{professionalId} */
   getProfessionalById: async (professionalId: string): Promise<ApiResponse<ProfessionalRecord>> => {
     const response = await api.get(`/dnirn/professionals/${professionalId}`);
     return response.data;
   },
 
-  /** * Consultar profissional pelo número de telefone
-   * Rota: GET /dnirn/professionals/byPhoneNumber/{phoneNumber}
-   */
+  /** Rota: GET /dnirn/professionals/byPhoneNumber/{phoneNumber} */
   getProfessionalByPhone: async (phoneNumber: string): Promise<ApiResponse<ProfessionalRecord>> => {
     const response = await api.get(`/dnirn/professionals/byPhoneNumber/${phoneNumber}`);
     return response.data;
   },
 
-  /** * Eliminar um profissional pelo ID
-   * Rota: DELETE /dnirn/professionals/{professionalId}
-   */
+  /** Rota: GET /dnirn/professionals/verifyPhoneNumber-recover/{phoneNumber} */
+  verifyPhoneNumberRecover: async (phoneNumber: string): Promise<ApiResponse<ProfessionalRecord>> => {
+    const response = await api.get(`/dnirn/professionals/verifyPhoneNumber-recover/${phoneNumber}`);
+    return response.data;
+  },
+
+  /** Rota: DELETE /dnirn/professionals/{professionalId} */
   deleteProfessional: async (professionalId: string): Promise<ApiResponse<void>> => {
     const response = await api.delete(`/dnirn/professionals/${professionalId}`);
     return response.data;

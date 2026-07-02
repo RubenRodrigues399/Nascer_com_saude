@@ -127,25 +127,24 @@ export default function BirthForm() {
     const payload = {
       individualChild: {
         fullName: formData.nomeCrianca.trim(),
-        gender: formData.sexo === 'M' ? 'MALE' : 'FEMALE',
-        identificationNumber: '',
+        gender: (formData.sexo === 'M' ? 'MALE' : 'FEMALE') as 'MALE' | 'FEMALE',
         birthDate: childBirthDate
       },
       height: 50, // Padrões de recém-nascido
       weight: 3.2,
-      vitalStatus: "ALIVE",
+      vitalStatus: "ALIVE" as const,
       gestacionalAge: {
         weeks: 39,
         days: 0
       },
-      placeOfBirth: "HOSPITAL",
+      placeOfBirth: "HOSPITAL" as const,
       professionalSupport: true,
       unityId: 1, // Puxa idUnity associado por padrão
       mother: {
         fullName: formData.nomeMae.trim(),
         phoneNumber: "244900000000",
         identificationDocument: {
-          type: "BI",
+          type: "BI" as const,
           number: formData.biMae.toUpperCase().trim(),
           expirationDate: "2034-12-31T00:00:00"
         },
@@ -157,15 +156,15 @@ export default function BirthForm() {
         fullName: formData.nomePai.trim(),
         phoneNumber: "244900000000",
         identificationDocument: {
-          type: "BI",
+          type: "BI" as const,
           number: formData.biPai.toUpperCase().trim(),
           expirationDate: "2034-12-31T00:00:00"
         },
         birthDate: defaultPastDate,
         municipalityId: Number(formData.municipioId),
         neighborhoodName: muniObj ? muniObj.name : "Desconhecido"
-      } : null,
-      witness: []
+      } : undefined,
+      witness: [] as import('@/app/services/recem-nascidos').WitnessInput[]
     };
 
     let apiSuccess = false;
