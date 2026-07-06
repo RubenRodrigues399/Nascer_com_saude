@@ -6,6 +6,10 @@ import { newbornService, CreateChildDto, ParentInput, ChildRecord } from '@/app/
 import { individualsService } from '@/app/services/individuos';
 import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 import { unityService, UnityRecord } from '@/app/services/unidades';
+import {
+  validateBI, validateFullName, isFutureDate, getTodayStr,
+  validateParentBirthDate, validateWitnessBirthDate,
+} from '@/utils/validators';
 
 type DocType = 'BI' | 'PASSAPORT' | 'DNV';
 type LookupState = 'idle' | 'searching' | 'found' | 'not_found';
@@ -36,13 +40,15 @@ const emptyWitness = (): WitnessFormData => ({ ...emptyParent(), gender: 'MALE' 
 
 const validateParent = (p: ParentFormData): Partial<Record<keyof ParentFormData, string>> => {
   const e: Partial<Record<keyof ParentFormData, string>> = {};
-  if (p.fullName.trim().split(' ').length < 2) e.fullName = 'Introduza o nome completo (mínimo 2 nomes).';
+  if (!validateFullName(p.fullName)) e.fullName = 'Introduza o nome completo (mínimo 2 nomes, só letras).';
   const phone = p.phoneNumber.trim().replace(/\s/g, '').replace(/^\+?244/, '');
   if (!phone) e.phoneNumber = 'Telefone obrigatório.';
   else if (!/^9\d{8}$/.test(phone)) e.phoneNumber = 'Formato inválido. 9 dígitos: Ex: 921025087';
   if (!p.docNumber.trim()) e.docNumber = 'Número do documento obrigatório.';
+  else if (p.docType === 'BI' && !validateBI(p.docNumber)) e.docNumber = 'Formato de BI inválido. Ex: 000123456LA041';
   if (!p.docExpiry) e.docExpiry = 'Validade do documento obrigatória.';
   if (!p.birthDate) e.birthDate = 'Data de nascimento obrigatória.';
+  else if (isFutureDate(p.birthDate)) e.birthDate = 'Data de nascimento não pode ser no futuro.';
   if (!p.municipalityId) e.municipalityId = 'Município obrigatório.';
   if (!p.neighborhoodName.trim()) e.neighborhoodName = 'Bairro obrigatório.';
   return e;
@@ -100,7 +106,7 @@ function ParentFields({
 
       <div className="space-y-1">
         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Data de Nascimento *</label>
-        <input type="date" value={form.birthDate}
+        <input type="date" max={getTodayStr()} value={form.birthDate}
           onChange={e => onChange({ birthDate: e.target.value })}
           className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
         {errors.birthDate && <p className="text-xs text-rose-600 font-semibold">{errors.birthDate}</p>}
@@ -228,13 +234,14 @@ function ParentForm({
 
 // ─── Formulário de testemunha (com cascata de localização interna) ────────────
 function WitnessFormSection({
-  index, data, onChange, onRemove, provinces,
+  index, data, onChange, onRemove, provinces, errors,
 }: {
   index: number;
   data: WitnessFormData;
   onChange: (patch: Partial<WitnessFormData>) => void;
   onRemove: () => void;
   provinces: Province[];
+  errors: Partial<Record<keyof ParentFormData, string>>;
 }) {
   const [munis, setMunis] = useState<Municipality[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
@@ -278,7 +285,7 @@ function WitnessFormSection({
         </select>
       </div>
 
-      <ParentFields form={data} onChange={onChange} errors={{}}
+      <ParentFields form={data} onChange={onChange} errors={errors}
         provinces={provinces} municipalities={munis} neighborhoods={neighborhoods}
         loadingMunis={loadingMunis} loadingNeighborhoods={loadingNeighborhoods} />
     </div>
@@ -320,6 +327,7 @@ export default function CreateChildPage() {
 
   // ── Testemunhas (opcional)
   const [witnesses, setWitnesses] = useState<WitnessFormData[]>([]);
+  const [witnessErrors, setWitnessErrors] = useState<Partial<Record<keyof ParentFormData, string>>[]>([]);
 
   // ── Criança
   const [childName, setChildName] = useState('');
@@ -431,21 +439,52 @@ export default function CreateChildPage() {
 
   const goToStep4 = () => {
     const errs: { [k: string]: string } = {};
-    if (childName.trim().split(' ').length < 2) errs.childName = 'Introduza o nome completo da criança.';
+    if (!validateFullName(childName)) errs.childName = 'Introduza o nome completo da criança (mínimo 2 nomes, só letras).';
     if (!childBirthDate) errs.childBirthDate = 'Data de nascimento obrigatória.';
+    else if (isFutureDate(childBirthDate)) errs.childBirthDate = 'Data de nascimento não pode ser no futuro.';
     if (!height || isNaN(Number(height)) || Number(height) <= 0) errs.height = 'Altura inválida.';
     if (!weight || isNaN(Number(weight)) || Number(weight) <= 0) errs.weight = 'Peso inválido.';
     if (!gestWeeks || isNaN(Number(gestWeeks))) errs.gestWeeks = 'Semanas gestacionais obrigatórias.';
     if (!selectedUnityId) errs.selectedUnityId = 'Unidade hospitalar obrigatória.';
-    if (vitalStatus === 'DECEASED' && !deathDate) errs.deathDate = 'Data de óbito obrigatória.';
+    if (vitalStatus === 'DECEASED') {
+      if (!deathDate) errs.deathDate = 'Data de óbito obrigatória.';
+      else if (isFutureDate(deathDate)) errs.deathDate = 'Data de óbito não pode ser no futuro.';
+      else if (childBirthDate && deathDate < childBirthDate) errs.deathDate = 'A data de óbito não pode ser anterior à data de nascimento.';
+    }
     if (!includeFather && witnesses.length < 2) errs.witnesses = 'Na ausência do pai, são necessárias pelo menos 2 testemunhas.';
+
+    // Validação cruzada: pais têm de ter nascido antes do filho, com um intervalo mínimo plausível
+    if (childBirthDate && !isFutureDate(childBirthDate)) {
+      const motherAgeErr = validateParentBirthDate(mother.birthDate, childBirthDate);
+      if (motherAgeErr) errs.motherAge = `Mãe: ${motherAgeErr} Volte ao Passo 1 para corrigir.`;
+      if (includeFather) {
+        const fatherAgeErr = validateParentBirthDate(father.birthDate, childBirthDate);
+        if (fatherAgeErr) errs.fatherAge = `Pai: ${fatherAgeErr} Volte ao Passo 2 para corrigir.`;
+      }
+    }
+
+    // Testemunhas: presença/formato + maioridade + nascimento anterior ao do filho
+    const wErrsList = witnesses.map(w => {
+      const we = validateParent(w);
+      if (childBirthDate && !isFutureDate(childBirthDate)) {
+        const witnessAgeErr = validateWitnessBirthDate(w.birthDate, childBirthDate);
+        if (witnessAgeErr) we.birthDate = witnessAgeErr;
+      }
+      return we;
+    });
+    setWitnessErrors(wErrsList);
+    if (wErrsList.some(we => Object.keys(we).length > 0)) errs.witnessesInvalid = 'Corrija os dados assinalados nas testemunhas acima.';
+
     setChildErrors(errs);
     if (Object.keys(errs).length === 0) setStep(4);
   };
 
   // ── Testemunhas
   const addWitness = () => { if (witnesses.length < 3) setWitnesses(w => [...w, emptyWitness()]); };
-  const removeWitness = (i: number) => setWitnesses(w => w.filter((_, idx) => idx !== i));
+  const removeWitness = (i: number) => {
+    setWitnesses(w => w.filter((_, idx) => idx !== i));
+    setWitnessErrors(e => e.filter((_, idx) => idx !== i));
+  };
   const updateWitness = (i: number, patch: Partial<WitnessFormData>) =>
     setWitnesses(w => w.map((item, idx) => idx === i ? { ...item, ...patch } : item));
 
@@ -506,7 +545,7 @@ export default function CreateChildPage() {
     setCreatedRecord(null);
     setMother(emptyParent()); setMotherErrors({}); setMotherLookupDoc(''); setMotherLookupState('idle');
     setIncludeFather(false); setFather(emptyParent()); setFatherErrors({}); setFatherLookupDoc(''); setFatherLookupState('idle');
-    setWitnesses([]);
+    setWitnesses([]); setWitnessErrors([]);
     setChildName(''); setChildGender('MALE'); setChildBirthDate(''); setChildBirthTime('00:00');
     setHeight(''); setWeight(''); setVitalStatus('ALIVE'); setDeathDate('');
     setGestWeeks(''); setGestDays('0'); setPlaceOfBirth('HOSPITAL'); setProfessionalSupport(true);
@@ -796,11 +835,20 @@ export default function CreateChildPage() {
                       onChange={patch => updateWitness(i, patch)}
                       onRemove={() => removeWitness(i)}
                       provinces={provinces}
+                      errors={witnessErrors[i] || {}}
                     />
                   ))}
+                  {childErrors.witnessesInvalid && <p className="text-xs text-rose-600 font-semibold">{childErrors.witnessesInvalid}</p>}
                 </div>
 
               </div>
+
+              {(childErrors.motherAge || childErrors.fatherAge) && (
+                <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold space-y-1">
+                  {childErrors.motherAge && <p>{childErrors.motherAge}</p>}
+                  {childErrors.fatherAge && <p>{childErrors.fatherAge}</p>}
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setStep(2)}

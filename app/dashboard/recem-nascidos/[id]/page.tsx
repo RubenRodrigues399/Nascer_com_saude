@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { newbornService, ChildRecord } from '@/app/services/recem-nascidos';
 import { individualsService } from '@/app/services/individuos';
 import { locationsService, Province, Municipality, safeNeighborhoodName } from '@/app/services/locations';
+import { validateBI, validateFullName, getTodayStr, validateParentBirthDate } from '@/utils/validators';
 
 type LookupState = 'idle' | 'searching' | 'found' | 'not_found' | 'submitting' | 'done';
 
@@ -131,11 +132,20 @@ export default function ChildDetailPage() {
 
   const validate = (): boolean => {
     const errs: Partial<FatherForm> = {};
-    if (fatherForm.fullName.trim().split(' ').length < 2) errs.fullName = 'Introduza o nome completo.';
-    if (!fatherForm.phoneNumber.trim()) errs.phoneNumber = 'Telefone obrigatório.';
+    if (!validateFullName(fatherForm.fullName)) errs.fullName = 'Introduza o nome completo (mínimo 2 nomes, só letras).';
+    const phone = fatherForm.phoneNumber.trim().replace(/\s/g, '').replace(/^\+?244/, '');
+    if (!phone) errs.phoneNumber = 'Telefone obrigatório.';
+    else if (!/^9\d{8}$/.test(phone)) errs.phoneNumber = 'Formato inválido. 9 dígitos: Ex: 921025087';
     if (!fatherForm.docNumber.trim()) errs.docNumber = 'Número do documento obrigatório.';
+    else if (fatherForm.docType === 'BI' && !validateBI(fatherForm.docNumber)) errs.docNumber = 'Formato de BI inválido. Ex: 000123456LA041';
     if (!fatherForm.docExpiry) errs.docExpiry = 'Data de validade obrigatória.';
-    if (!fatherForm.birthDate) errs.birthDate = 'Data de nascimento obrigatória.';
+    if (!fatherForm.birthDate) {
+      errs.birthDate = 'Data de nascimento obrigatória.';
+    } else {
+      const childBirth = child?.individual?.birthDate?.split('T')[0];
+      const ageErr = validateParentBirthDate(fatherForm.birthDate, childBirth || '');
+      if (ageErr) errs.birthDate = ageErr;
+    }
     if (!fatherForm.municipalityId) errs.municipalityId = 'Município obrigatório.';
     if (!fatherForm.neighborhoodName.trim()) errs.neighborhoodName = 'Bairro obrigatório.';
     setFormErrors(errs);
@@ -357,7 +367,7 @@ export default function ChildDetailPage() {
 
                   <div className="space-y-1">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Data de Nascimento *</label>
-                    <input type="date" required disabled={lookupState === 'submitting'} value={fatherForm.birthDate}
+                    <input type="date" max={getTodayStr()} required disabled={lookupState === 'submitting'} value={fatherForm.birthDate}
                       onChange={e => setFatherForm(f => ({ ...f, birthDate: e.target.value }))}
                       className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     {formErrors.birthDate && <p className="text-xs text-rose-600">{formErrors.birthDate}</p>}

@@ -9,6 +9,7 @@ import { logAction } from '@/utils/audit';
 import { newbornService, UpdateChildDto } from '@/app/services/recem-nascidos';
 import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 import { unityService, UnityRecord } from '@/app/services/unidades';
+import { validateFullName, isFutureDate, getTodayStr } from '@/utils/validators';
 
 // ─── Modal: Ver Detalhes ──────────────────────────────────────────────────────
 function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: () => void; onEdit: () => void }) {
@@ -172,14 +173,19 @@ function EditChildModal({ record, onClose, onSaved }: { record: any; onClose: ()
 
   const validate = (): boolean => {
     const e: Partial<Record<keyof EditForm, string>> = {};
-    if (form.fullName.trim().split(' ').length < 2) e.fullName = 'Nome completo obrigatório.';
+    if (!validateFullName(form.fullName)) e.fullName = 'Introduza o nome completo (mínimo 2 nomes, só letras).';
     if (!form.birthDate) e.birthDate = 'Data de nascimento obrigatória.';
+    else if (isFutureDate(form.birthDate)) e.birthDate = 'Data de nascimento não pode ser no futuro.';
     if (!form.height || Number(form.height) <= 0) e.height = 'Altura inválida.';
     if (!form.weight || Number(form.weight) <= 0) e.weight = 'Peso inválido.';
     if (!form.gestWeeks) e.gestWeeks = 'Semanas gestacionais obrigatórias.';
     if (!form.municipalityId) e.municipalityId = 'Município obrigatório.';
     if (!form.neighborhoodName.trim()) e.neighborhoodName = 'Bairro obrigatório.';
-    if (form.vitalStatus === 'DECEASED' && !form.deathDate) e.deathDate = 'Data de óbito obrigatória.';
+    if (form.vitalStatus === 'DECEASED') {
+      if (!form.deathDate) e.deathDate = 'Data de óbito obrigatória.';
+      else if (isFutureDate(form.deathDate)) e.deathDate = 'Data de óbito não pode ser no futuro.';
+      else if (form.birthDate && form.deathDate < form.birthDate) e.deathDate = 'A data de óbito não pode ser anterior à data de nascimento.';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -252,7 +258,7 @@ function EditChildModal({ record, onClose, onSaved }: { record: any; onClose: ()
 
             <div className="space-y-1">
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data de Nascimento *</label>
-              <input type="date" value={form.birthDate} onChange={e => patch({ birthDate: e.target.value })}
+              <input type="date" max={getTodayStr()} value={form.birthDate} onChange={e => patch({ birthDate: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               {errors.birthDate && <p className="text-xs text-rose-600">{errors.birthDate}</p>}
             </div>
@@ -269,7 +275,7 @@ function EditChildModal({ record, onClose, onSaved }: { record: any; onClose: ()
             {form.vitalStatus === 'DECEASED' && (
               <div className="space-y-1 col-span-2">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data de Óbito *</label>
-                <input type="date" value={form.deathDate} onChange={e => patch({ deathDate: e.target.value })}
+                <input type="date" max={getTodayStr()} value={form.deathDate} onChange={e => patch({ deathDate: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                 {errors.deathDate && <p className="text-xs text-rose-600">{errors.deathDate}</p>}
               </div>
