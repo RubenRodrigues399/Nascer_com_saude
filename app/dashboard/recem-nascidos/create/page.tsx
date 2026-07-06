@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { newbornService, CreateChildDto, ParentInput } from '@/app/services/recem-nascidos';
+import { newbornService, CreateChildDto, ParentInput, ChildRecord } from '@/app/services/recem-nascidos';
 import { individualsService } from '@/app/services/individuos';
-import { locationsService, Province, Municipality, Neighborhood } from '@/app/services/locations';
+import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 import { unityService, UnityRecord } from '@/app/services/unidades';
 
 type DocType = 'BI' | 'PASSAPORT' | 'DNV';
@@ -161,7 +161,7 @@ function ParentFields({
             onChange={e => onChange({ neighborhoodName: e.target.value })}
             className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
             <option value="">-- Escolha o Bairro --</option>
-            {neighborhoods.map(n => <option key={n.id} value={n.name}>{n.name}</option>)}
+            {neighborhoods.map(n => <option key={n.id} value={safeNeighborhoodName(n.name)}>{safeNeighborhoodName(n.name)}</option>)}
           </select>
         ) : (
           <input type="text" value={form.neighborhoodName}
@@ -292,6 +292,7 @@ export default function CreateChildPage() {
   const [step, setStep] = useState(1);
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [createdRecord, setCreatedRecord] = useState<ChildRecord | null>(null);
 
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [unities, setUnities] = useState<UnityRecord[]>([]);
@@ -401,7 +402,7 @@ export default function CreateChildPage() {
           birthDate: (ind.birthDate || '').split('T')[0],
           provinceId: String(ind.neighborhood?.municipality?.province?.id || ''),
           municipalityId: String(ind.neighborhood?.municipality?.id || ''),
-          neighborhoodName: ind.neighborhood?.name || '',
+          neighborhoodName: safeNeighborhoodName(ind.neighborhood?.name) || '',
         });
         setState('found');
       } else {
@@ -437,6 +438,7 @@ export default function CreateChildPage() {
     if (!gestWeeks || isNaN(Number(gestWeeks))) errs.gestWeeks = 'Semanas gestacionais obrigatórias.';
     if (!selectedUnityId) errs.selectedUnityId = 'Unidade hospitalar obrigatória.';
     if (vitalStatus === 'DECEASED' && !deathDate) errs.deathDate = 'Data de óbito obrigatória.';
+    if (!includeFather && witnesses.length < 2) errs.witnesses = 'Na ausência do pai, são necessárias pelo menos 2 testemunhas.';
     setChildErrors(errs);
     if (Object.keys(errs).length === 0) setStep(4);
   };
@@ -477,7 +479,8 @@ export default function CreateChildPage() {
     try {
       const res = await newbornService.createChild(payload);
       if (res.success) {
-        router.push('/dashboard/recem-nascidos');
+        console.log('[CREATE CHILD] Resposta da API:', res.data);
+        setCreatedRecord(res.data);
       } else {
         console.warn('[CREATE CHILD] API recusou:', res);
         setServerError(res.message || 'Erro ao comunicar com a API.');
@@ -496,6 +499,49 @@ export default function CreateChildPage() {
       setLoading(false);
     }
   };
+
+  const resetAll = () => {
+    setStep(1);
+    setServerError('');
+    setCreatedRecord(null);
+    setMother(emptyParent()); setMotherErrors({}); setMotherLookupDoc(''); setMotherLookupState('idle');
+    setIncludeFather(false); setFather(emptyParent()); setFatherErrors({}); setFatherLookupDoc(''); setFatherLookupState('idle');
+    setWitnesses([]);
+    setChildName(''); setChildGender('MALE'); setChildBirthDate(''); setChildBirthTime('00:00');
+    setHeight(''); setWeight(''); setVitalStatus('ALIVE'); setDeathDate('');
+    setGestWeeks(''); setGestDays('0'); setPlaceOfBirth('HOSPITAL'); setProfessionalSupport(true);
+    setSelectedUnityId(''); setChildErrors({});
+  };
+
+  if (createdRecord) {
+    const dnv = createdRecord.individual?.identificationDocument?.identificationNumber || 'N/D';
+    const childFullName = createdRecord.individual?.fullName || childName;
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 p-2">
+        <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm text-center space-y-5">
+          <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600 text-2xl font-black">✓</div>
+          <div>
+            <h1 className="text-xl font-black text-slate-800">Assento Registado com Sucesso</h1>
+            <p className="text-sm text-slate-500 mt-1">{childFullName}</p>
+          </div>
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl inline-block">
+            <p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">Nº DNV Gerado</p>
+            <p className="text-2xl font-black text-blue-800 font-mono tracking-wide">{dnv}</p>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={resetAll}
+              className="w-1/2 py-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50">
+              Registar Outro
+            </button>
+            <button type="button" onClick={() => router.push('/dashboard/recem-nascidos')}
+              className="w-1/2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm">
+              Ver na Lista
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const stepLabels = ['Mãe', 'Pai', 'Bebé', 'Confirmar'];
 
@@ -729,7 +775,9 @@ export default function CreateChildPage() {
                 <div className="space-y-3 pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-black text-slate-600 uppercase tracking-wide">Testemunhas (opcional)</p>
+                      <p className="text-xs font-black text-slate-600 uppercase tracking-wide">
+                        Testemunhas {includeFather ? '(opcional)' : <span className="text-rose-600">(obrigatório: mín. 2, sem pai)</span>}
+                      </p>
                       <p className="text-[10px] text-slate-400">Máximo 3 testemunhas</p>
                     </div>
                     {witnesses.length < 3 && (
@@ -739,6 +787,7 @@ export default function CreateChildPage() {
                       </button>
                     )}
                   </div>
+                  {childErrors.witnesses && <p className="text-xs text-rose-600 font-semibold">{childErrors.witnesses}</p>}
                   {witnesses.map((w, i) => (
                     <WitnessFormSection
                       key={i}

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { unityService } from '@/app/services/unidades';
-import { locationsService, Province, Municipality, Neighborhood } from '@/app/services/locations';
+import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 
 export default function CreateUnidadePage() {
   const router = useRouter();
@@ -105,7 +105,7 @@ export default function CreateUnidadePage() {
       email: email.trim().toLowerCase(),
       neighborhoodId: Number(selectedBairroId), // ID numérico do bairro
       municipalityId: Number(selectedMuniId),   // ID numérico do município exigido
-      neighborhoodName: bairroSelecionado ? bairroSelecionado.name : "Desconhecido" // Nome de texto do bairro exigido
+      neighborhoodName: bairroSelecionado ? safeNeighborhoodName(bairroSelecionado.name) : "Desconhecido" // Nome de texto do bairro exigido
     };
 
     try {
@@ -220,7 +220,7 @@ export default function CreateUnidadePage() {
                 className="w-full p-2 border border-slate-300 bg-white disabled:bg-slate-100 rounded-xl text-xs font-semibold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">-- Escolha o Bairro --</option>
-                {bairros.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {bairros.map(b => <option key={b.id} value={b.id}>{safeNeighborhoodName(b.name)}</option>)}
               </select>
             </div>
           </div>

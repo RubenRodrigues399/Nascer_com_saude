@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { newbornService, ChildRecord } from '@/app/services/recem-nascidos';
 import { individualsService } from '@/app/services/individuos';
-import { locationsService, Province, Municipality } from '@/app/services/locations';
+import { locationsService, Province, Municipality, safeNeighborhoodName } from '@/app/services/locations';
 
 type LookupState = 'idle' | 'searching' | 'found' | 'not_found' | 'submitting' | 'done';
 
@@ -116,7 +116,7 @@ export default function ChildDetailPage() {
           docExpiry: (ind.identificationDocument?.expirationDateDocument || ind.identificationDocument?.expirationDate || '').split('T')[0],
           birthDate: (ind.birthDate || '').split('T')[0],
           municipalityId: String(ind.municipality?.id || ind.neighborhood?.municipality?.id || ''),
-          neighborhoodName: ind.neighborhood?.name || '',
+          neighborhoodName: safeNeighborhoodName(ind.neighborhood?.name),
         });
         setLookupState('found');
       } else {

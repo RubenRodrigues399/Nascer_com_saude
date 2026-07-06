@@ -7,7 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { generateAssentoPDF } from '@/utils/pdfGenerator';
 import { logAction } from '@/utils/audit';
 import { newbornService, UpdateChildDto } from '@/app/services/recem-nascidos';
-import { locationsService, Province, Municipality, Neighborhood } from '@/app/services/locations';
+import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 import { unityService, UnityRecord } from '@/app/services/unidades';
 
 // ─── Modal: Ver Detalhes ──────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ function EditChildModal({ record, onClose, onSaved }: { record: any; onClose: ()
     professionalSupport: record.professionalSupport ?? true,
     provinceId: String(record.individual?.neighborhood?.municipality?.province?.id || ''),
     municipalityId: String(record.individual?.neighborhood?.municipality?.id || ''),
-    neighborhoodName: record.individual?.neighborhood?.name || '',
+    neighborhoodName: safeNeighborhoodName(record.individual?.neighborhood?.name),
   });
 
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -349,7 +349,7 @@ function EditChildModal({ record, onClose, onSaved }: { record: any; onClose: ()
                 <select value={form.neighborhoodName} onChange={e => patch({ neighborhoodName: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                   <option value="">-- Escolha --</option>
-                  {neighborhoods.map(n => <option key={n.id} value={n.name}>{n.name}</option>)}
+                  {neighborhoods.map(n => <option key={n.id} value={safeNeighborhoodName(n.name)}>{safeNeighborhoodName(n.name)}</option>)}
                 </select>
               ) : (
                 <input type="text" value={form.neighborhoodName} onChange={e => patch({ neighborhoodName: e.target.value })}
@@ -575,7 +575,7 @@ export default function RecemNascidosPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                <th className="px-5 py-3">Cód. Registo</th>
+                <th className="px-5 py-3">Nº DNV</th>
                 <th className="px-5 py-3">Criança / Género</th>
                 <th className="px-5 py-3">Progenitores & Origem</th>
                 <th className="px-5 py-3">Data / Hora</th>
@@ -591,6 +591,7 @@ export default function RecemNascidosPage() {
               ) : (
                 filteredRecords.map(record => {
                   const id = record.id || record.code || 'N/D';
+                  const dnv = record.individual?.identificationDocument?.identificationNumber || null;
                   const nomeCrianca = record.nomeCrianca || record.individual?.fullName || '—';
                   const sexo = record.individual?.gender === 'MALE' ? 'M' : 'F';
                   const nomeMae = record.nomeMae || record.mother?.individual?.fullName || '—';
@@ -601,7 +602,14 @@ export default function RecemNascidosPage() {
 
                   return (
                     <tr key={id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-4 font-mono font-bold text-slate-500 text-xs">{id.substring(0, 14)}…</td>
+                      <td className="px-5 py-4 font-mono text-xs">
+                        {dnv ? (
+                          <div className="font-bold text-slate-800">{dnv}</div>
+                        ) : (
+                          <div className="font-bold text-slate-500">{id.substring(0, 14)}…</div>
+                        )}
+                        {dnv && <div className="text-[10px] text-slate-400">{id.substring(0, 14)}…</div>}
+                      </td>
                       <td className="px-5 py-4">
                         <div className="font-semibold text-slate-800">{nomeCrianca}</div>
                         <div className="text-xs text-slate-400">{sexo === 'M' ? 'Masculino' : 'Feminino'}</div>

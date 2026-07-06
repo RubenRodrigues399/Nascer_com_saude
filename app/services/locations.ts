@@ -30,6 +30,25 @@ export interface CreateNeighborhoodDto {
   municipalityId: number;
 }
 
+/**
+ * Alguns bairros foram gravados com o nome corrompido (ex: `{"name":"Palanca","municipalityId":3}`
+ * em vez de apenas `"Palanca"`), provavelmente por um bug antigo de submissão. Esta função
+ * extrai o nome real quando isso acontece, para não propagar o JSON para a UI nem para novos payloads.
+ */
+export function safeNeighborhoodName(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed.name === 'string') return parsed.name;
+    } catch {
+      // não é JSON válido, mantém o valor original
+    }
+  }
+  return raw;
+}
+
 // ApiResponse genérica baseada no padrão do teu Back-End
 interface ApiResponse<T> {
   status: number;
@@ -134,9 +153,18 @@ export const locationsService = {
     return response.data;
   },
 
-  /** Actualizar dados de um Bairro */
-  updateBairro: async (id: number, data: { name: string; municipalityId: number }): Promise<ApiResponse<Neighborhood>> => {
-    const response = await api.patch(`/dnirn/neighborhoods/${id}`, data);
+  /**
+   * Actualizar dados de um Bairro.
+   * A doc do Swagger declara o corpo como uma string JSON (`"string"`), mas a API não faz o parse —
+   * guarda literalmente os bytes recebidos como `name` (foi assim que apareceram os valores corrompidos
+   * `{"name":...}` e depois `"Palanca"` com aspas). Por isso enviamos o texto puro, sem qualquer
+   * serialização JSON, usando `transformRequest` para impedir o axios de o envolver em aspas.
+   */
+  updateBairro: async (id: number, name: string): Promise<ApiResponse<Neighborhood>> => {
+    const response = await api.patch(`/dnirn/neighborhoods/${id}`, name, {
+      headers: { 'Content-Type': 'text/plain' },
+      transformRequest: [(data) => data],
+    });
     return response.data;
   },
 

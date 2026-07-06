@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { individualsService, IndividualRecord, IndividualUpdateDTO } from '@/app/services/individuos';
-import { locationsService, Province, Municipality, Neighborhood } from '@/app/services/locations';
+import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 
 type SearchMode = 'all' | 'phone' | 'bi';
 
@@ -15,7 +15,7 @@ function IndividualDetailModal({ ind, onClose, onEdit }: { ind: IndividualRecord
   const docTipo = ind.identificationDocument?.typeDocument || '—';
   const docNum = ind.identificationDocument?.identificationNumber || '—';
   const docValidade = ind.identificationDocument?.expirationDateDocument?.split('T')[0] || '—';
-  const bairro = ind.neighborhood?.name || '—';
+  const bairro = safeNeighborhoodName(ind.neighborhood?.name) || '—';
   const municipio = ind.neighborhood?.municipality?.name || '—';
   const provincia = ind.neighborhood?.municipality?.province?.name || '—';
 
@@ -101,7 +101,7 @@ function EditIndividualModal({ ind, onClose, onSaved }: { ind: IndividualRecord;
     phoneNumber: ind.phoneNumber || '',
     provinceId: String(ind.neighborhood?.municipality?.province?.id || ''),
     municipalityId: String(ind.neighborhood?.municipality?.id || ''),
-    neighborhoodName: ind.neighborhood?.name || '',
+    neighborhoodName: safeNeighborhoodName(ind.neighborhood?.name),
   });
 
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -291,7 +291,7 @@ function EditIndividualModal({ ind, onClose, onSaved }: { ind: IndividualRecord;
                 <select value={form.neighborhoodName} onChange={e => patch({ neighborhoodName: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                   <option value="">-- Escolha --</option>
-                  {neighborhoods.map(n => <option key={n.id} value={n.name}>{n.name}</option>)}
+                  {neighborhoods.map(n => <option key={n.id} value={safeNeighborhoodName(n.name)}>{safeNeighborhoodName(n.name)}</option>)}
                 </select>
               ) : (
                 <input type="text" value={form.neighborhoodName} onChange={e => patch({ neighborhoodName: e.target.value })}
@@ -520,7 +520,7 @@ export default function IndividuosPage() {
                     <td className="px-5 py-4 font-mono text-xs text-slate-600">{ind.phoneNumber || 'N/D'}</td>
                     <td className="px-5 py-4 text-xs text-slate-500">
                       <div>{ind.neighborhood?.municipality?.name || 'N/D'}</div>
-                      <div className="text-slate-400">{ind.neighborhood?.name || ''}</div>
+                      <div className="text-slate-400">{safeNeighborhoodName(ind.neighborhood?.name)}</div>
                     </td>
                     <td className="px-5 py-4 text-slate-500 text-xs">{ind.birthDate?.split('T')[0] || 'N/D'}</td>
                     <td className="px-5 py-4">

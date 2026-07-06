@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { locationsService, Province, Municipality, Neighborhood } from '@/app/services/locations';
+import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 
 export default function BairrosPage() {
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -14,10 +14,13 @@ export default function BairrosPage() {
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
 
-  // Modal de criação
+  // Modal de criação (tem cascata própria de província → município, independente dos filtros da página)
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newBairroName, setNewBairroName] = useState('');
+  const [modalProvinceId, setModalProvinceId] = useState('');
   const [modalMuniId, setModalMuniId] = useState('');
+  const [modalMunicipalities, setModalMunicipalities] = useState<Municipality[]>([]);
+  const [loadingModalMuni, setLoadingModalMuni] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -67,6 +70,22 @@ export default function BairrosPage() {
     load();
   }, [selectedProvinceId]);
 
+  useEffect(() => {
+    setModalMunicipalities([]);
+    setModalMuniId('');
+    if (!modalProvinceId) return;
+    setLoadingModalMuni(true);
+    locationsService.getMunicipalitiesByProvince(Number(modalProvinceId))
+      .then(res => {
+        if (res.success) {
+          const data = res.data as any;
+          setModalMunicipalities(Array.isArray(data) ? data : (data?.municipalities || data?.list || []));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingModalMuni(false));
+  }, [modalProvinceId]);
+
   const loadBairros = async (muniId?: string) => {
     const id = muniId ?? selectedMunicipalityId;
     if (!id) { setBairros([]); return; }
@@ -98,8 +117,9 @@ export default function BairrosPage() {
       if (res.success) {
         setIsCreateOpen(false);
         setNewBairroName('');
-        if (modalMuniId === selectedMunicipalityId) loadBairros();
-        else setSelectedMunicipalityId(modalMuniId);
+        setSelectedProvinceId(modalProvinceId);
+        setSelectedMunicipalityId(modalMuniId);
+        loadBairros(modalMuniId);
         flash('Bairro registado com sucesso.');
       } else {
         setCreateError(res.message || 'Erro ao registar.');
@@ -114,7 +134,7 @@ export default function BairrosPage() {
   // --- EDITAR ---
   const openEdit = (bairro: Neighborhood) => {
     setEditingBairro(bairro);
-    setEditBairroName(bairro.name);
+    setEditBairroName(safeNeighborhoodName(bairro.name));
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -122,8 +142,7 @@ export default function BairrosPage() {
     if (!editingBairro?.id || !editBairroName.trim()) return;
     setEditLoading(true);
     try {
-      const muniId = editingBairro.municipality?.id || Number(selectedMunicipalityId);
-      const res = await locationsService.updateBairro(editingBairro.id, { name: editBairroName.trim(), municipalityId: muniId });
+      const res = await locationsService.updateBairro(editingBairro.id, editBairroName.trim());
       if (res.success) {
         setEditingBairro(null);
         loadBairros();
@@ -131,8 +150,9 @@ export default function BairrosPage() {
       } else {
         flash(res.message || 'Erro ao actualizar.', true);
       }
-    } catch {
-      flash('Erro de comunicação com o servidor.', true);
+    } catch (err: any) {
+      console.error('[EDITAR BAIRRO] Erro:', err.response?.status, err.response?.data);
+      flash(err.response?.data?.message || err.response?.data?.error || 'Erro de comunicação com o servidor.', true);
     } finally {
       setEditLoading(false);
     }
@@ -152,8 +172,9 @@ export default function BairrosPage() {
         flash(res.message || 'Erro ao eliminar.', true);
         setConfirmDeleteId(null);
       }
-    } catch {
-      flash('Erro de comunicação com o servidor.', true);
+    } catch (err: any) {
+      console.error('[ELIMINAR BAIRRO] Erro:', err.response?.status, err.response?.data);
+      flash(err.response?.data?.message || err.response?.data?.error || 'Erro de comunicação com o servidor.', true);
       setConfirmDeleteId(null);
     } finally {
       setDeleteLoading(false);
@@ -169,7 +190,7 @@ export default function BairrosPage() {
           <p className="text-slate-500 text-sm">Selecione um município para gerir os seus bairros.</p>
         </div>
         <button
-          onClick={() => { setModalMuniId(selectedMunicipalityId); setNewBairroName(''); setCreateError(''); setIsCreateOpen(true); }}
+          onClick={() => { setModalProvinceId(selectedProvinceId); setNewBairroName(''); setCreateError(''); setIsCreateOpen(true); }}
           className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2"
         >
           <span className="text-lg leading-none">+</span> Adicionar Bairro
@@ -221,7 +242,7 @@ export default function BairrosPage() {
               {bairros.map((bairro) => (
                 <tr key={bairro.id} className="hover:bg-slate-50/80 transition-all text-slate-700 text-sm">
                   <td className="p-4 font-mono text-xs text-slate-400">{bairro.id}</td>
-                  <td className="p-4 font-semibold text-slate-800">{bairro.name}</td>
+                  <td className="p-4 font-semibold text-slate-800">{safeNeighborhoodName(bairro.name)}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
                       <button onClick={() => openEdit(bairro)} className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors">Editar</button>
@@ -252,11 +273,19 @@ export default function BairrosPage() {
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               </div>
               <div className="space-y-1">
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Município de Destino</label>
-                <select required disabled={createLoading || municipalities.length === 0} value={modalMuniId} onChange={(e) => setModalMuniId(e.target.value)}
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Província</label>
+                <select required disabled={createLoading} value={modalProvinceId} onChange={(e) => setModalProvinceId(e.target.value)}
                   className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
-                  <option value="">-- Selecione o Município --</option>
-                  {municipalities.map((muni) => <option key={muni.id} value={muni.id}>{muni.name}</option>)}
+                  <option value="">-- Selecione a Província --</option>
+                  {provinces.map((prov) => <option key={prov.id} value={prov.id}>{prov.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Município de Destino</label>
+                <select required disabled={createLoading || !modalProvinceId || loadingModalMuni || modalMunicipalities.length === 0} value={modalMuniId} onChange={(e) => setModalMuniId(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-300 bg-white disabled:bg-slate-50 disabled:text-slate-400 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
+                  <option value="">{loadingModalMuni ? 'A carregar...' : !modalProvinceId ? 'Escolha uma província primeiro' : '-- Selecione o Município --'}</option>
+                  {modalMunicipalities.map((muni) => <option key={muni.id} value={muni.id}>{muni.name}</option>)}
                 </select>
               </div>
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">

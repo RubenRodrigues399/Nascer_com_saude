@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { unityService, UnityRecord } from '@/app/services/unidades';
-import { locationsService, Province, Municipality } from '@/app/services/locations';
+import { locationsService, Province, Municipality, safeNeighborhoodName } from '@/app/services/locations';
 
 type SearchMode = 'all' | 'nif' | 'id';
 
@@ -11,7 +11,7 @@ function locationPath(uni: UnityRecord) {
   const parts = [
     uni.neighborhood?.municipality?.province?.name,
     uni.neighborhood?.municipality?.name,
-    uni.neighborhood?.name,
+    safeNeighborhoodName(uni.neighborhood?.name),
   ].filter(Boolean);
   return parts.length ? parts.join(' › ') : 'N/D';
 }
@@ -147,7 +147,7 @@ export default function UnidadesListPage() {
       nif: uni.nif,
       phoneNumber: uni.phoneNumber,
       email: uni.email,
-      neighborhoodName: uni.neighborhood?.name ?? '',
+      neighborhoodName: safeNeighborhoodName(uni.neighborhood?.name),
     });
     setEditProvinceId('');
     setEditMunicipalityId('');
