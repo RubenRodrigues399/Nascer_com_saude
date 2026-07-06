@@ -54,7 +54,10 @@ export default function RecoverPasswordPage() {
     setLoading(true);
     try {
       const phone = formatPhone(phoneNumber);
-      const res = await authService.validateOTP({ phoneNumber: phone, type: 'RECOVER_PASSWORD', code: otp.trim() });
+      const payload = { phoneNumber: phone, type: 'RECOVER_PASSWORD' as const, code: otp.trim() };
+      console.log('[DEBUG] validateOTP payload enviado:', payload);
+      const res = await authService.validateOTP(payload);
+      console.log('[DEBUG] validateOTP resposta:', res);
       if (res.success && res.data?.token) {
         setOtpToken(res.data.token);
         setStep('password');
@@ -62,6 +65,7 @@ export default function RecoverPasswordPage() {
         setError(res.message || 'Código inválido ou expirado.');
       }
     } catch (err: any) {
+      console.error('[DEBUG] validateOTP erro completo:', err.response?.data || err);
       setError(err.response?.data?.message || 'Erro ao validar o código OTP.');
     } finally {
       setLoading(false);

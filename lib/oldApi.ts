@@ -3,7 +3,7 @@ import axios from 'axios';
 // 1. Definição da API Key (Em produção, deves colocar isto no teu arquivo .env.local)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-registro-civil-ixfv.onrender.com';
 const API_KEY = process.env.NEXT_PUBLIC_DNIRN_API_KEY || 'dnirn_maternidades_key_prod_2026';
-
+ 
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
