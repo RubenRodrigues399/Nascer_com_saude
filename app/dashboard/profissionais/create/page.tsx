@@ -6,6 +6,7 @@ import { professionalsService, CreateProfessionalDto, CreateSuperProfessionalDto
 import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 import { unityService, UnityRecord } from '@/app/services/unidades';
 import { useAuth } from '@/context/AuthContext';
+import { validateFullName, isFutureDate, getAgeYears, getTodayStr } from '@/utils/validators';
 
 type Role = 'TECHNICAL' | 'ADMINISTRATIVE' | 'ADMINISTRATIVE_SUPER';
 type DocType = 'BI' | 'PASSAPORT' | 'DNV';
@@ -112,6 +113,27 @@ export default function CreateProfessionalPage() {
     e.preventDefault();
     setError('');
 
+    if (!validateFullName(fullName)) {
+      setError('Introduza o nome completo (mínimo 2 nomes, só letras).');
+      return;
+    }
+    const normalizedPhone = phoneNumber.trim().replace(/\s/g, '').replace(/^\+?244/, '');
+    if (!/^9\d{8}$/.test(normalizedPhone)) {
+      setError('Telefone inválido. Formato: 9 dígitos. Ex: 921025087');
+      return;
+    }
+    if (!birthDate) {
+      setError('Data de nascimento obrigatória.');
+      return;
+    }
+    if (isFutureDate(birthDate)) {
+      setError('Data de nascimento não pode ser no futuro.');
+      return;
+    }
+    if (getAgeYears(birthDate) < 18) {
+      setError('O profissional deve ser maior de idade (18 anos).');
+      return;
+    }
     if (!isSuper && !selectedUnityId) {
       setError('Seleccione a unidade hospitalar.');
       return;
@@ -257,7 +279,7 @@ export default function CreateProfessionalPage() {
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1 tracking-wide">Data de Nascimento *</label>
             <input
-              type="date" required disabled={loading} value={birthDate}
+              type="date" max={getTodayStr()} required disabled={loading} value={birthDate}
               onChange={e => setBirthDate(e.target.value)}
               className="w-full p-2.5 border border-slate-300 rounded-xl text-slate-800 bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />

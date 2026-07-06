@@ -8,6 +8,21 @@ export function validateBI(bi: string): boolean {
     return biRegex.test(bi.trim());
   }
 
+/** Verifica se a validade de um documento já passou (data anterior a hoje). */
+export function isExpiredDate(dateStr: string): boolean {
+  if (!dateStr) return false;
+  return dateStr < getTodayStr();
+}
+
+/**
+ * Verificação genérica de plausibilidade para nº de passaporte — não é o formato
+ * oficial angolano (que não está documentado no sistema), apenas alfanumérico
+ * com 6 a 10 caracteres, para apanhar erros óbvios de digitação.
+ */
+export function validatePassportNumber(docNumber: string): boolean {
+  return /^[A-Z0-9]{6,10}$/i.test(docNumber.trim());
+}
+
 /** Data de hoje no formato usado pelos <input type="date"> (YYYY-MM-DD) */
 export function getTodayStr(): string {
   return new Date().toISOString().split('T')[0];

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { newbornService, ChildRecord } from '@/app/services/recem-nascidos';
 import { individualsService } from '@/app/services/individuos';
 import { locationsService, Province, Municipality, safeNeighborhoodName } from '@/app/services/locations';
-import { validateBI, validateFullName, getTodayStr, validateParentBirthDate } from '@/utils/validators';
+import { validateBI, validateFullName, getTodayStr, validateParentBirthDate, isExpiredDate, validatePassportNumber } from '@/utils/validators';
 
 type LookupState = 'idle' | 'searching' | 'found' | 'not_found' | 'submitting' | 'done';
 
@@ -138,7 +138,9 @@ export default function ChildDetailPage() {
     else if (!/^9\d{8}$/.test(phone)) errs.phoneNumber = 'Formato inválido. 9 dígitos: Ex: 921025087';
     if (!fatherForm.docNumber.trim()) errs.docNumber = 'Número do documento obrigatório.';
     else if (fatherForm.docType === 'BI' && !validateBI(fatherForm.docNumber)) errs.docNumber = 'Formato de BI inválido. Ex: 000123456LA041';
+    else if (fatherForm.docType === 'PASSAPORT' && !validatePassportNumber(fatherForm.docNumber)) errs.docNumber = 'Formato de passaporte inválido.';
     if (!fatherForm.docExpiry) errs.docExpiry = 'Data de validade obrigatória.';
+    else if (isExpiredDate(fatherForm.docExpiry)) errs.docExpiry = 'Documento expirado. Insira um documento válido.';
     if (!fatherForm.birthDate) {
       errs.birthDate = 'Data de nascimento obrigatória.';
     } else {

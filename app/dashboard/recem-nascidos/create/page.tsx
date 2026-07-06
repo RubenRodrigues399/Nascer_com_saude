@@ -7,8 +7,8 @@ import { individualsService } from '@/app/services/individuos';
 import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 import { unityService, UnityRecord } from '@/app/services/unidades';
 import {
-  validateBI, validateFullName, isFutureDate, getTodayStr,
-  validateParentBirthDate, validateWitnessBirthDate,
+  validateBI, validateFullName, isFutureDate, isExpiredDate, getTodayStr,
+  validateParentBirthDate, validateWitnessBirthDate, validatePassportNumber,
 } from '@/utils/validators';
 
 type DocType = 'BI' | 'PASSAPORT' | 'DNV';
@@ -46,7 +46,9 @@ const validateParent = (p: ParentFormData): Partial<Record<keyof ParentFormData,
   else if (!/^9\d{8}$/.test(phone)) e.phoneNumber = 'Formato inválido. 9 dígitos: Ex: 921025087';
   if (!p.docNumber.trim()) e.docNumber = 'Número do documento obrigatório.';
   else if (p.docType === 'BI' && !validateBI(p.docNumber)) e.docNumber = 'Formato de BI inválido. Ex: 000123456LA041';
+  else if (p.docType === 'PASSAPORT' && !validatePassportNumber(p.docNumber)) e.docNumber = 'Formato de passaporte inválido.';
   if (!p.docExpiry) e.docExpiry = 'Validade do documento obrigatória.';
+  else if (isExpiredDate(p.docExpiry)) e.docExpiry = 'Documento expirado. Insira um documento válido.';
   if (!p.birthDate) e.birthDate = 'Data de nascimento obrigatória.';
   else if (isFutureDate(p.birthDate)) e.birthDate = 'Data de nascimento não pode ser no futuro.';
   if (!p.municipalityId) e.municipalityId = 'Município obrigatório.';

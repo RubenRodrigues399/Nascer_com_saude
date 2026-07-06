@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { individualsService, IndividualRecord, IndividualUpdateDTO } from '@/app/services/individuos';
 import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
+import { validateBI, validateFullName, isFutureDate, getTodayStr } from '@/utils/validators';
 
 type SearchMode = 'all' | 'phone' | 'bi';
 
@@ -141,10 +142,12 @@ function EditIndividualModal({ ind, onClose, onSaved }: { ind: IndividualRecord;
 
   const validate = (): boolean => {
     const e: Partial<Record<keyof EditForm, string>> = {};
-    if (form.fullName.trim().split(' ').length < 2) e.fullName = 'Nome completo obrigatório (mínimo 2 nomes).';
+    if (!validateFullName(form.fullName)) e.fullName = 'Introduza o nome completo (mínimo 2 nomes, só letras).';
     if (!form.docNumber.trim()) e.docNumber = 'Número do documento obrigatório.';
+    else if (form.docType === 'BI' && !validateBI(form.docNumber)) e.docNumber = 'Formato de BI inválido. Ex: 000123456LA041';
     if (!form.docExpiry) e.docExpiry = 'Validade do documento obrigatória.';
     if (!form.birthDate) e.birthDate = 'Data de nascimento obrigatória.';
+    else if (isFutureDate(form.birthDate)) e.birthDate = 'Data de nascimento não pode ser no futuro.';
     if (!form.municipalityId) e.municipalityId = 'Município obrigatório.';
     if (!form.neighborhoodName.trim()) e.neighborhoodName = 'Bairro obrigatório.';
     if (form.phoneNumber) {
@@ -225,7 +228,7 @@ function EditIndividualModal({ ind, onClose, onSaved }: { ind: IndividualRecord;
 
             <div className="space-y-1">
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data de Nascimento *</label>
-              <input type="date" value={form.birthDate} onChange={e => patch({ birthDate: e.target.value })}
+              <input type="date" max={getTodayStr()} value={form.birthDate} onChange={e => patch({ birthDate: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               {errors.birthDate && <p className="text-xs text-rose-600">{errors.birthDate}</p>}
             </div>
