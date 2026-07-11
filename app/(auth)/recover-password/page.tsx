@@ -60,8 +60,8 @@ export default function RecoverPasswordPage() {
       console.log('[DEBUG] validateOTP resposta completa:', res);
       console.log('[DEBUG] validateOTP data:', res.data);
       if (res.success) {
-        const token = res.data?.token || '';
-        console.log('[DEBUG] Token extraído:', token);
+        const token = res.data?.authorizedRecoverToken || '';
+        console.log('[DEBUG] Token extraído (authorizedRecoverToken):', token);
         setOtpToken(token);
         setStep('password');
       } else {

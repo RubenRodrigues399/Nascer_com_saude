@@ -119,7 +119,7 @@ export const authService = {
   /** * Validar o código OTP recebido por SMS (rota pública)
    * Rota: POST /dnirn/auth/validateOTP
    */
-  validateOTP: async (data: { phoneNumber: string; type: 'RECOVER_PASSWORD'; code: string }): Promise<ApiResponse<{ token: string }>> => {
+  validateOTP: async (data: { phoneNumber: string; type: 'RECOVER_PASSWORD'; code: string }): Promise<ApiResponse<{ authorizedRecoverToken: string }>> => {
     const response = await publicApi.post('/dnirn/auth/validateOTP', data);
     return response.data;
   },
