@@ -20,7 +20,7 @@ export interface ProfessionalIndividualInput {
   birthDate: string; // YYYY-MM-DD
   municipalityId: number;
   neighborhoodName: string;
-  role: 'PROFESSIONAL'; // obrigatório pela API
+  role: 'PROFESSIONAL' | 'FAMILY'; // Pode ser PROFESSIONAL ou FAMILY
 }
 
 // POST /dnirn/professionals
@@ -102,17 +102,15 @@ export const professionalsService = {
     };
 
     // DEFINIÇÃO DINÂMICA DA ROTA: Se for super, aponta para /super, senão vai para a rota comum
-    const targetRoute = isSuperUser ? '/dnirn/professionals/super' : '/dnirn/professionals';
+    // Nota: A barra final é IMPORTANTE para a API (RESTful)
+    const targetRoute = isSuperUser ? '/dnirn/professionals/super' : '/dnirn/professionals/';
     
     console.log(`[DNIRN Auth] Operador detetado como Super? ${isSuperUser}. Encaminhando para: ${targetRoute}`);
+    console.log(`[DNIRN Payload] Enviando para ${targetRoute}:`, JSON.stringify(payload, null, 2));
+    console.log(`[DNIRN Token] Bearer ${token ? token.substring(0, 20) + '...' : 'NENHUM'}`);
 
-    const response = await api.post(targetRoute, payload, {
-      headers: {
-        'x-api-key': API_KEY,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    // O interceptor do api já adiciona Authorization automaticamente via sessionStorage
+    const response = await api.post(targetRoute, payload);
     return response.data;
   },
 

@@ -84,13 +84,17 @@ export default function RecoverPasswordPage() {
     setLoading(true);
     try {
       const phone = formatPhone(phoneNumber);
-      const res = await authService.recoverPassword({ phoneNumber: phone, newPassword, token: otpToken });
+      const payload = { phoneNumber: phone, newPassword, token: otpToken };
+      console.log('[DEBUG] recoverPassword payload enviado:', payload);
+      const res = await authService.recoverPassword(payload);
+      console.log('[DEBUG] recoverPassword resposta:', res);
       if (res.success) {
         setStep('done');
       } else {
         setError(res.message || 'Erro ao redefinir a palavra-passe.');
       }
     } catch (err: any) {
+      console.error('[DEBUG] recoverPassword erro completo:', err.response?.data || err);
       setError(err.response?.data?.message || 'Erro de comunicação com o servidor.');
     } finally {
       setLoading(false);

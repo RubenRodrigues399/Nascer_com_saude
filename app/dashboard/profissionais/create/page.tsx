@@ -175,6 +175,7 @@ export default function CreateProfessionalPage() {
           phoneNumber: phoneNumber.trim(),
           individual: individualPayload,
         };
+        console.log('[SUPER] Enviando payload super:', JSON.stringify(superPayload, null, 2));
         response = await professionalsService.createSuperProfessional(superPayload);
       } else {
         const regularPayload: CreateProfessionalDto = {
@@ -184,6 +185,7 @@ export default function CreateProfessionalPage() {
           municipalityId,
           idUnity: Number(selectedUnityId),
         };
+        console.log('[REGULAR] Enviando payload regular:', JSON.stringify(regularPayload, null, 2));
         response = await professionalsService.createProfessional(regularPayload);
       }
 

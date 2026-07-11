@@ -108,11 +108,11 @@ export const authService = {
     return response.data;
   },
 
-  /** * Verificar o número de telefone e disparar OTP por SMS (rota autenticada — requer Bearer token)
+  /** * Verificar o número de telefone e disparar OTP por SMS (rota pública)
    * Rota: GET /dnirn/professionals/verifyPhoneNumber-recover/{phoneNumber}
    */
   verifyPhoneForRecovery: async (phoneNumber: string): Promise<ApiResponse<void>> => {
-    const response = await api.get(`/dnirn/professionals/verifyPhoneNumber-recover/${phoneNumber}`);
+    const response = await publicApi.get(`/dnirn/professionals/verifyPhoneNumber-recover/${phoneNumber}`);
     return response.data;
   },
 
@@ -128,7 +128,9 @@ export const authService = {
    * Rota: POST /dnirn/auth/recover-password
    */
   recoverPassword: async (data: { phoneNumber: string; newPassword: string; token: string }): Promise<ApiResponse<void>> => {
+    console.log('[DEBUG] authService.recoverPassword - enviando payload:', data);
     const response = await publicApi.post('/dnirn/auth/recover-password', data);
+    console.log('[DEBUG] authService.recoverPassword - resposta:', response.data);
     return response.data;
   }
 };
