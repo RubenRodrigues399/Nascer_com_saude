@@ -254,7 +254,7 @@ export default function ChildDetailPage() {
           <InfoField label="Unidade Hospitalar" value={unityName} />
           <InfoField label="Apoio Profissional" value={child?.professionalSupport ? 'Sim' : 'Não'} />
         </div>
-        <AuditSection creator={child?.creator} updater={child?.updater} />
+        <AuditSection creator={child?.individual?.creator} updater={child?.individual?.updater} />
       </div>
 
       {/* Dados da Mãe */}

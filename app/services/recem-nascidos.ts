@@ -1,5 +1,5 @@
 import { api } from '@/app/services/api';
-import { AuditUser } from '@/app/services/locations';
+import { AuditUser, Neighborhood } from '@/app/services/locations';
 
 // ============================================================================
 // INTERFACES / TIPOS — CRIANÇAS
@@ -103,15 +103,9 @@ export interface ChildRecord {
       expirationDateDocument: string;
     };
     birthDate: string;
-    neighborhood?: {
-      id: number;
-      name: string;
-      municipality?: {
-        id: number;
-        name: string;
-        province?: { id: number; name: string };
-      };
-    };
+    neighborhood?: Neighborhood;
+    creator?: AuditUser;
+    updater?: AuditUser;
     createdAt: string;
     updatedAt: string;
   };
@@ -122,12 +116,10 @@ export interface ChildRecord {
   gestacionalAge: { weeks: number; days: number };
   placeOfBirth: 'HOSPITAL' | 'HOME' | 'OTHER';
   professionalSupport: boolean;
-  unity?: { id: number; name: string; nif?: string };
+  unity?: { id: number; name: string; nif?: string; neighborhood?: Neighborhood };
   mother?: FamilyMemberSummary;
   father?: FamilyMemberSummary;
   witness?: FamilyMemberSummary[];
-  creator?: AuditUser;
-  updater?: AuditUser;
 }
 
 interface ApiResponse<T> {
