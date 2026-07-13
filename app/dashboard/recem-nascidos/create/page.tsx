@@ -10,9 +10,6 @@ import {
   validateBI, validateFullName, isFutureDate, isExpiredDate, getTodayStr,
   validateParentBirthDate, validateWitnessBirthDate, validatePassportNumber,
 } from '@/utils/validators';
-import { useAuth } from '@/context/AuthContext';
-import { canWriteRecemNascidos } from '@/lib/permissions';
-import { useRequireAccess } from '@/hooks/useRequireAccess';
 
 type DocType = 'BI' | 'PASSAPORT' | 'DNV';
 type LookupState = 'idle' | 'searching' | 'found' | 'not_found';
@@ -31,6 +28,8 @@ interface ParentFormData {
 
 interface WitnessFormData extends ParentFormData {
   gender: 'MALE' | 'FEMALE';
+  lookupDoc: string;
+  lookupState: LookupState;
 }
 
 const emptyParent = (): ParentFormData => ({
@@ -39,7 +38,7 @@ const emptyParent = (): ParentFormData => ({
   provinceId: '', municipalityId: '', neighborhoodName: '',
 });
 
-const emptyWitness = (): WitnessFormData => ({ ...emptyParent(), gender: 'MALE' });
+const emptyWitness = (): WitnessFormData => ({ ...emptyParent(), gender: 'MALE', lookupDoc: '', lookupState: 'idle' });
 
 const validateParent = (p: ParentFormData): Partial<Record<keyof ParentFormData, string>> => {
   const e: Partial<Record<keyof ParentFormData, string>> = {};
@@ -187,6 +186,41 @@ function ParentFields({
   );
 }
 
+// ─── Caixa de pesquisa rápida por nº de documento (partilhada entre progenitores e testemunhas) ──
+function LookupBox({
+  label, lookupDoc, onLookupDocChange, lookupState, onLookup,
+}: {
+  label: string;
+  lookupDoc: string;
+  onLookupDocChange: (v: string) => void;
+  lookupState: LookupState;
+  onLookup: () => void;
+}) {
+  const isSearching = lookupState === 'searching';
+  return (
+    <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
+      <p className="text-[11px] font-black text-blue-700 uppercase tracking-wider">
+        Pesquisa Rápida (opcional) — pré-preenche automaticamente
+      </p>
+      <div className="flex gap-2">
+        <input type="text" value={lookupDoc}
+          onChange={e => onLookupDocChange(e.target.value.toUpperCase())}
+          onKeyDown={e => e.key === 'Enter' && !isSearching && lookupDoc.trim() && onLookup()}
+          placeholder={`Nº do documento de ${label}`}
+          disabled={isSearching}
+          className="flex-1 px-3 py-2 border border-blue-300 bg-white rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase" />
+        <button type="button" onClick={onLookup}
+          disabled={!lookupDoc.trim() || isSearching}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold rounded-xl text-sm transition-colors">
+          {isSearching ? '...' : 'Pesquisar'}
+        </button>
+      </div>
+      {lookupState === 'found' && <p className="text-xs font-bold text-emerald-700">✓ Cidadão encontrado — campos pré-preenchidos.</p>}
+      {lookupState === 'not_found' && <p className="text-xs font-bold text-amber-700">⚠ Não encontrado — preencha os dados manualmente.</p>}
+    </div>
+  );
+}
+
 // ─── Formulário de progenitor (com pesquisa rápida opcional) ─────────────────
 function ParentForm({
   label, lookupDoc, onLookupDocChange, lookupState, onLookup,
@@ -207,29 +241,10 @@ function ParentForm({
   loadingMunis: boolean;
   loadingNeighborhoods: boolean;
 }) {
-  const isSearching = lookupState === 'searching';
   return (
     <div className="space-y-5">
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
-        <p className="text-[11px] font-black text-blue-700 uppercase tracking-wider">
-          Pesquisa Rápida (opcional) — pré-preenche automaticamente
-        </p>
-        <div className="flex gap-2">
-          <input type="text" value={lookupDoc}
-            onChange={e => onLookupDocChange(e.target.value.toUpperCase())}
-            onKeyDown={e => e.key === 'Enter' && !isSearching && lookupDoc.trim() && onLookup()}
-            placeholder={`Nº do documento de ${label}`}
-            disabled={isSearching}
-            className="flex-1 px-3 py-2 border border-blue-300 bg-white rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase" />
-          <button type="button" onClick={onLookup}
-            disabled={!lookupDoc.trim() || isSearching}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold rounded-xl text-sm transition-colors">
-            {isSearching ? '...' : 'Pesquisar'}
-          </button>
-        </div>
-        {lookupState === 'found' && <p className="text-xs font-bold text-emerald-700">✓ Cidadão encontrado — campos pré-preenchidos.</p>}
-        {lookupState === 'not_found' && <p className="text-xs font-bold text-amber-700">⚠ Não encontrado — preencha os dados manualmente.</p>}
-      </div>
+      <LookupBox label={label} lookupDoc={lookupDoc} onLookupDocChange={onLookupDocChange}
+        lookupState={lookupState} onLookup={onLookup} />
       <ParentFields form={form} onChange={onChange} errors={errors}
         provinces={provinces} municipalities={municipalities} neighborhoods={neighborhoods}
         loadingMunis={loadingMunis} loadingNeighborhoods={loadingNeighborhoods} />
@@ -239,12 +254,13 @@ function ParentForm({
 
 // ─── Formulário de testemunha (com cascata de localização interna) ────────────
 function WitnessFormSection({
-  index, data, onChange, onRemove, provinces, errors,
+  index, data, onChange, onRemove, onLookup, provinces, errors,
 }: {
   index: number;
   data: WitnessFormData;
   onChange: (patch: Partial<WitnessFormData>) => void;
   onRemove: () => void;
+  onLookup: () => void;
   provinces: Province[];
   errors: Partial<Record<keyof ParentFormData, string>>;
 }) {
@@ -281,6 +297,10 @@ function WitnessFormSection({
         </button>
       </div>
 
+      <LookupBox label={`Testemunha ${index + 1}`} lookupDoc={data.lookupDoc}
+        onLookupDocChange={v => onChange({ lookupDoc: v })}
+        lookupState={data.lookupState} onLookup={onLookup} />
+
       <div className="space-y-1">
         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Género da Testemunha *</label>
         <select value={data.gender} onChange={e => onChange({ gender: e.target.value as 'MALE' | 'FEMALE' })}
@@ -300,8 +320,6 @@ function WitnessFormSection({
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function CreateChildPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { blocked } = useRequireAccess(canWriteRecemNascidos(user?.roleProfessional));
 
   const [step, setStep] = useState(1);
   const [serverError, setServerError] = useState('');
@@ -558,10 +576,6 @@ export default function CreateChildPage() {
     setGestWeeks(''); setGestDays('0'); setPlaceOfBirth('HOSPITAL'); setProfessionalSupport(true);
     setSelectedUnityId(''); setChildErrors({});
   };
-
-  if (blocked) {
-    return <div className="p-8 text-center text-slate-400 text-sm animate-pulse">A verificar permissões...</div>;
-  }
 
   if (createdRecord) {
     const dnv = createdRecord.individual?.identificationDocument?.identificationNumber || 'N/D';
@@ -826,7 +840,7 @@ export default function CreateChildPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-black text-slate-600 uppercase tracking-wide">
-                        Testemunhas {includeFather ? '(opcional)' : <span className="text-rose-600">(obrigatório: mín. 2, sem pai)</span>}
+                        Testemunhas {includeFather ? '(opcional)' : <span className="text-rose-600">(obrigatório: mín. 2)</span>}
                       </p>
                       <p className="text-[10px] text-slate-400">Máximo 3 testemunhas</p>
                     </div>
@@ -845,6 +859,7 @@ export default function CreateChildPage() {
                       data={w}
                       onChange={patch => updateWitness(i, patch)}
                       onRemove={() => removeWitness(i)}
+                      onLookup={() => doLookup(w.lookupDoc, f => updateWitness(i, f), s => updateWitness(i, { lookupState: s }))}
                       provinces={provinces}
                       errors={witnessErrors[i] || {}}
                     />
