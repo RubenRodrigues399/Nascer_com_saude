@@ -116,7 +116,7 @@ const handleLogin = async (e: React.FormEvent) => {
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 transition-all"
-              placeholder="Ex: 923000000 ou 'admin'"
+              placeholder="Digite o seu número de telefone"
             />
           </div>
 
@@ -129,7 +129,7 @@ const handleLogin = async (e: React.FormEvent) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 transition-all"
-              placeholder="Ex: 123456"
+              placeholder=" Digite a sua senha "
             />
           </div>
 
