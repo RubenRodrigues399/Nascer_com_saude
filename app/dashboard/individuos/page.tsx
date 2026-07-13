@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { individualsService, IndividualRecord, IndividualUpdateDTO } from '@/app/services/individuos';
 import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 import { validateBI, validateFullName, isFutureDate, getTodayStr } from '@/utils/validators';
+import { AuditSection } from '@/components/DetailsModal';
 
 type SearchMode = 'all' | 'phone' | 'bi';
 
@@ -29,7 +30,6 @@ function IndividualDetailModal({ ind, onClose, onEdit }: { ind: IndividualRecord
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Cidadão / Indivíduo</p>
             <h2 className="text-xl font-black text-slate-800">{ind.fullName}</h2>
-            <p className="text-[10px] font-mono text-slate-400 mt-1">{ind.id}</p>
           </div>
           <button onClick={onClose}
             className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-lg flex-shrink-0">×</button>
@@ -56,12 +56,13 @@ function IndividualDetailModal({ ind, onClose, onEdit }: { ind: IndividualRecord
             </div>
           </DetailSection>
 
-          {(ind.createdAt || ind.updatedAt) && (
+          {(ind.createdAt || ind.updatedAt || ind.creator || ind.updater) && (
             <DetailSection title="Metadados">
               <div className="grid grid-cols-2 gap-3">
                 {ind.createdAt && <DetailField label="Criado em" value={ind.createdAt.split('T')[0]} />}
                 {ind.updatedAt && <DetailField label="Actualizado em" value={ind.updatedAt.split('T')[0]} />}
               </div>
+              <AuditSection creator={ind.creator} updater={ind.updater} />
             </DetailSection>
           )}
         </div>

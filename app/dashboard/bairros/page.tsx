@@ -291,7 +291,6 @@ export default function BairrosPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">ID</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nome do Bairro</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Município</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Província</th>
@@ -301,7 +300,6 @@ export default function BairrosPage() {
               <tbody className="divide-y divide-slate-100">
                 {allBairros.map((bairro) => (
                   <tr key={bairro.id} className="hover:bg-slate-50/80 transition-all text-slate-700 text-sm">
-                    <td className="p-4 font-mono text-xs text-slate-400">{bairro.id}</td>
                     <td className="p-4 font-semibold text-slate-800">{safeNeighborhoodName(bairro.name)}</td>
                     <td className="p-4 text-slate-600">{bairro.municipality?.name || '—'}</td>
                     <td className="p-4 text-slate-600">{bairro.municipality?.province?.name || '—'}</td>
@@ -333,7 +331,6 @@ export default function BairrosPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">ID</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nome do Bairro</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acções</th>
               </tr>
@@ -341,7 +338,6 @@ export default function BairrosPage() {
             <tbody className="divide-y divide-slate-100">
               {bairros.map((bairro) => (
                 <tr key={bairro.id} className="hover:bg-slate-50/80 transition-all text-slate-700 text-sm">
-                  <td className="p-4 font-mono text-xs text-slate-400">{bairro.id}</td>
                   <td className="p-4 font-semibold text-slate-800">{safeNeighborhoodName(bairro.name)}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
@@ -450,7 +446,6 @@ export default function BairrosPage() {
       {/* DETALHES / AUDITORIA */}
       {detailsBairro && (
         <DetailsModal title="Detalhes do Bairro" onClose={() => setDetailsBairro(null)}>
-          <DetailRow label="ID" value={`#${detailsBairro.id}`} />
           <DetailRow label="Nome" value={safeNeighborhoodName(detailsBairro.name)} />
           <AuditSection creator={detailsBairro.creator} updater={detailsBairro.updater} />
 
