@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { professionalsService, ProfessionalRecord } from '@/app/services/profissionais';
+import { DetailsModal, DetailRow, AuditSection } from '@/components/DetailsModal';
 
 type SearchMode = 'all' | 'phone' | 'id' | 'verify';
 
@@ -37,6 +38,9 @@ export default function ProfessionalsListPage() {
   // Confirmação de apagar
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Detalhes / auditoria
+  const [detailsPro, setDetailsPro] = useState<ProfessionalRecord | null>(null);
 
   const flash = (msg: string, isError = false) => {
     isError ? setActionError(msg) : setActionMessage(msg);
@@ -241,7 +245,13 @@ export default function ProfessionalsListPage() {
                   </td>
                   <td className="p-4 text-xs text-slate-500">{pro.unity?.name ?? 'N/D'}</td>
                   <td className="p-4">
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setDetailsPro(pro)}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors"
+                      >
+                        Detalhes
+                      </button>
                       <button
                         onClick={() => setConfirmDeleteId(pro.id)}
                         className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
@@ -279,6 +289,16 @@ export default function ProfessionalsListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* DETALHES / AUDITORIA */}
+      {detailsPro && (
+        <DetailsModal title="Detalhes do Profissional" onClose={() => setDetailsPro(null)}>
+          <DetailRow label="Nome" value={detailsPro.individual?.fullName ?? 'N/D'} />
+          <DetailRow label="Cargo" value={roleLabel[detailsPro.roleProfessional] ?? detailsPro.roleProfessional} />
+          <DetailRow label="Unidade" value={detailsPro.unity?.name ?? 'N/D'} />
+          <AuditSection creator={detailsPro.creator} updater={detailsPro.updater} />
+        </DetailsModal>
       )}
     </div>
   );

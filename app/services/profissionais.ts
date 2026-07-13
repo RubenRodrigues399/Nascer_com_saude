@@ -2,6 +2,7 @@
 
 import { api } from './api';
 import { IndividualData } from './auth';
+import { AuditUser } from './locations';
 
 // ============================================================================
 // INTERFACES / TIPOS PARA GESTÃO DE PROFISSIONAIS
@@ -53,6 +54,8 @@ export interface ProfessionalRecord {
   createdAt?: string;
   updatedAt?: string;
   deleted?: boolean;
+  creator?: AuditUser;
+  updater?: AuditUser;
 }
 
 interface ApiResponse<T> {

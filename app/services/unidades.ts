@@ -1,6 +1,7 @@
 //Métodos para o registo e listagem de maternidades
 
 import { api } from './api';
+import { AuditUser } from './locations';
 
 // ============================================================================
 // INTERFACES / TIPOS PARA GESTÃO DE UNIDADES (MATERNIDADES)
@@ -24,6 +25,8 @@ export interface UnityRecord {
   email: string;
   createdAt: string;
   updatedAt: string;
+  creator?: AuditUser;
+  updater?: AuditUser;
   neighborhood?: {
     id: number;
     name: string;

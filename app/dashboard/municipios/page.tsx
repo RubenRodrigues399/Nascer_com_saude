@@ -191,7 +191,6 @@ export default function MunicipiosPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">ID</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nome do Município</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acções</th>
               </tr>
@@ -199,7 +198,6 @@ export default function MunicipiosPage() {
             <tbody className="divide-y divide-slate-100">
               {municipalities.map((muni) => (
                 <tr key={muni.id} className="hover:bg-slate-50/80 transition-all text-slate-700 text-sm">
-                  <td className="p-4 font-mono text-xs text-slate-400">{muni.id}</td>
                   <td className="p-4 font-semibold text-slate-800">{muni.name}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
@@ -314,7 +312,6 @@ export default function MunicipiosPage() {
       {/* DETALHES / AUDITORIA */}
       {detailsMuni && (
         <DetailsModal title="Detalhes do Município" onClose={() => setDetailsMuni(null)}>
-          <DetailRow label="ID" value={`#${detailsMuni.id}`} />
           <DetailRow label="Nome" value={detailsMuni.name} />
           <AuditSection creator={detailsMuni.creator} updater={detailsMuni.updater} />
         </DetailsModal>

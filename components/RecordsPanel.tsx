@@ -128,9 +128,6 @@ export default function RecordsPanel() {
                     <div className="font-bold text-slate-900">
                       {record.nomeCrianca}
                     </div>
-                    <div className="text-xs text-slate-400 font-mono mt-0.5">
-                      {record.id}
-                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div>{record.nomeMae}</div>

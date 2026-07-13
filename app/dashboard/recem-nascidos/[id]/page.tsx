@@ -6,6 +6,7 @@ import { newbornService, ChildRecord } from '@/app/services/recem-nascidos';
 import { individualsService } from '@/app/services/individuos';
 import { locationsService, Province, Municipality, safeNeighborhoodName } from '@/app/services/locations';
 import { validateBI, validateFullName, getTodayStr, validateParentBirthDate, isExpiredDate, validatePassportNumber } from '@/utils/validators';
+import { AuditSection } from '@/components/DetailsModal';
 
 type LookupState = 'idle' | 'searching' | 'found' | 'not_found' | 'submitting' | 'done';
 
@@ -232,7 +233,6 @@ export default function ChildDetailPage() {
           <div>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Assento de Nascimento</p>
             <h1 className="text-2xl font-black text-slate-800">{childName}</h1>
-            <p className="text-xs font-mono text-slate-400 mt-1">{id}</p>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-bold ${vitalLabel === 'Vivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
             {vitalLabel}
@@ -254,6 +254,7 @@ export default function ChildDetailPage() {
           <InfoField label="Unidade Hospitalar" value={unityName} />
           <InfoField label="Apoio Profissional" value={child?.professionalSupport ? 'Sim' : 'Não'} />
         </div>
+        <AuditSection creator={child?.creator} updater={child?.updater} />
       </div>
 
       {/* Dados da Mãe */}

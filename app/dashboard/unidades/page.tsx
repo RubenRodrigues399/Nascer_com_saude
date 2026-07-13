@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { unityService, UnityRecord } from '@/app/services/unidades';
 import { locationsService, Province, Municipality, safeNeighborhoodName } from '@/app/services/locations';
+import { DetailsModal, DetailRow, AuditSection } from '@/components/DetailsModal';
 
 type SearchMode = 'all' | 'nif' | 'id';
 
@@ -48,6 +49,9 @@ export default function UnidadesListPage() {
   // Confirmação de apagar
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Detalhes / auditoria
+  const [detailsUnity, setDetailsUnity] = useState<UnityRecord | null>(null);
 
   const flash = (msg: string, isError = false) => {
     isError ? setActionError(msg) : setActionMessage(msg);
@@ -287,7 +291,6 @@ export default function UnidadesListPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-              <th className="p-4">ID</th>
               <th className="p-4">Nome da Unidade</th>
               <th className="p-4">NIF</th>
               <th className="p-4">Telemóvel</th>
@@ -297,19 +300,24 @@ export default function UnidadesListPage() {
           </thead>
           <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={6} className="p-8 text-center text-slate-400 animate-pulse">A carregar unidades...</td></tr>
+              <tr><td colSpan={5} className="p-8 text-center text-slate-400 animate-pulse">A carregar unidades...</td></tr>
             ) : displayed.length === 0 ? (
-              <tr><td colSpan={6} className="p-8 text-center text-slate-400">Nenhuma unidade encontrada.</td></tr>
+              <tr><td colSpan={5} className="p-8 text-center text-slate-400">Nenhuma unidade encontrada.</td></tr>
             ) : (
               displayed.map((uni) => (
                 <tr key={uni.id} className="hover:bg-slate-50/60 transition-all">
-                  <td className="p-4 font-mono text-xs text-slate-400">{uni.id}</td>
                   <td className="p-4 font-semibold text-slate-800">{uni.name}</td>
                   <td className="p-4 font-mono text-xs text-slate-600">{uni.nif || 'N/D'}</td>
                   <td className="p-4 text-slate-600">{uni.phoneNumber || 'N/D'}</td>
                   <td className="p-4 text-xs text-slate-500">{locationPath(uni)}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setDetailsUnity(uni)}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors"
+                      >
+                        Detalhes
+                      </button>
                       <button
                         onClick={() => openEdit(uni)}
                         className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
@@ -430,6 +438,16 @@ export default function UnidadesListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* DETALHES / AUDITORIA */}
+      {detailsUnity && (
+        <DetailsModal title="Detalhes da Unidade" onClose={() => setDetailsUnity(null)}>
+          <DetailRow label="Nome" value={detailsUnity.name} />
+          <DetailRow label="NIF" value={detailsUnity.nif || 'N/D'} />
+          <DetailRow label="Localização" value={locationPath(detailsUnity)} />
+          <AuditSection creator={detailsUnity.creator} updater={detailsUnity.updater} />
+        </DetailsModal>
       )}
     </div>
   );

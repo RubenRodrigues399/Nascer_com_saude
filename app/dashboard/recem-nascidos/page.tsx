@@ -10,6 +10,7 @@ import { newbornService, UpdateChildDto } from '@/app/services/recem-nascidos';
 import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
 import { unityService, UnityRecord } from '@/app/services/unidades';
 import { validateFullName, isFutureDate, getTodayStr } from '@/utils/validators';
+import { AuditSection } from '@/components/DetailsModal';
 
 // ─── Modal: Ver Detalhes ──────────────────────────────────────────────────────
 function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: () => void; onEdit: () => void }) {
@@ -39,7 +40,6 @@ function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: (
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Assento de Nascimento</p>
             <h2 className="text-xl font-black text-slate-800">{nomeCrianca}</h2>
-            <p className="text-[10px] font-mono text-slate-400 mt-1">{id}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className={`px-3 py-1 rounded-full text-xs font-bold ${vivo ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
@@ -89,6 +89,7 @@ function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: (
               </div>
             </ModalSection>
           )}
+          <AuditSection creator={record.creator} updater={record.updater} />
         </div>
         <div className="p-4 border-t border-slate-100 flex gap-3 flex-shrink-0">
           <button onClick={onClose}
@@ -612,9 +613,8 @@ export default function RecemNascidosPage() {
                         {dnv ? (
                           <div className="font-bold text-slate-800">{dnv}</div>
                         ) : (
-                          <div className="font-bold text-slate-500">{id.substring(0, 14)}…</div>
+                          <div className="font-semibold text-slate-400 italic">Pendente</div>
                         )}
-                        {dnv && <div className="text-[10px] text-slate-400">{id.substring(0, 14)}…</div>}
                       </td>
                       <td className="px-5 py-4">
                         <div className="font-semibold text-slate-800">{nomeCrianca}</div>
@@ -684,8 +684,7 @@ export default function RecemNascidosPage() {
               </svg>
             </div>
             <h3 className="text-sm font-black text-slate-800 mb-1">Confirmar Eliminação</h3>
-            <p className="text-xs text-slate-500 mb-1">O assento de nascimento será removido permanentemente.</p>
-            <p className="text-[10px] font-mono text-slate-400 mb-5">{deleteId}</p>
+            <p className="text-xs text-slate-500 mb-5">O assento de nascimento será removido permanentemente.</p>
             <div className="flex gap-3">
               <button onClick={() => setDeleteId(null)} disabled={deleting}
                 className="flex-1 py-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>

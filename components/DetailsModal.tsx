@@ -42,19 +42,13 @@ export function AuditSection({ creator, updater }: { creator?: AuditUser; update
       {creator && (
         <div className="flex justify-between items-start gap-4 py-1">
           <span className="text-xs text-slate-500">Criado por</span>
-          <span className="text-xs text-right">
-            <span className="font-semibold text-slate-700">{creator.name}</span>
-            <span className="block font-mono text-[10px] text-slate-400">{creator.id}</span>
-          </span>
+          <span className="text-xs font-semibold text-slate-700 text-right">{creator.name}</span>
         </div>
       )}
       {updater && (
         <div className="flex justify-between items-start gap-4 py-1">
           <span className="text-xs text-slate-500">Actualizado por</span>
-          <span className="text-xs text-right">
-            <span className="font-semibold text-slate-700">{updater.name}</span>
-            <span className="block font-mono text-[10px] text-slate-400">{updater.id}</span>
-          </span>
+          <span className="text-xs font-semibold text-slate-700 text-right">{updater.name}</span>
         </div>
       )}
     </div>

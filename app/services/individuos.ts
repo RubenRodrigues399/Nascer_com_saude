@@ -1,6 +1,7 @@
 // Gestão de Indivíduos/Cidadãos
 
 import { api } from './api';
+import { AuditUser } from './locations';
 
 // ============================================================================
 // INTERFACES / TIPOS — INDIVÍDUOS
@@ -46,6 +47,8 @@ export interface IndividualRecord {
   };
   createdAt?: string;
   updatedAt?: string;
+  creator?: AuditUser;
+  updater?: AuditUser;
 }
 
 interface ApiResponse<T> {

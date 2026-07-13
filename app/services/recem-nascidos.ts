@@ -1,4 +1,5 @@
 import { api } from '@/app/services/api';
+import { AuditUser } from '@/app/services/locations';
 
 // ============================================================================
 // INTERFACES / TIPOS — CRIANÇAS
@@ -125,6 +126,8 @@ export interface ChildRecord {
   mother?: FamilyMemberSummary;
   father?: FamilyMemberSummary;
   witness?: FamilyMemberSummary[];
+  creator?: AuditUser;
+  updater?: AuditUser;
 }
 
 interface ApiResponse<T> {
