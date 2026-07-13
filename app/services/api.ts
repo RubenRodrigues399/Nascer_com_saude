@@ -50,7 +50,7 @@ api.interceptors.response.use(
 
     // Se o erro for 401 e ainda não tentámos renovar esta requisição específica
     if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true; // Marca para não entrar em loop infinito
+      originalRequest._retry = true;
 
       if (typeof window !== 'undefined') {
         const session = sessionStorage.getItem('dnirn_session');

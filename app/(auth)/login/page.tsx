@@ -121,7 +121,7 @@ const handleLogin = async (e: React.FormEvent) => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Palavra-passe (SMS)</label>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Palavra-passe</label>
             <input
               type="password" 
               required 
