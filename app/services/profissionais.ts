@@ -73,7 +73,6 @@ export const professionalsService = {
 
   /** Rota: POST /dnirn/professionals (ou /super para ADMINISTRATIVE_SUPER) */
  createProfessional: async (data: CreateProfessionalDto): Promise<ApiResponse<ProfessionalRecord>> => {
-    let token = '';
     let isSuperUser = false;
     let userUnityId = 1;
 
@@ -81,8 +80,7 @@ export const professionalsService = {
       const session = sessionStorage.getItem('dnirn_session');
       if (session) {
         const parsed = JSON.parse(session);
-        token = parsed.tokenAccess;
-        
+
         // Descobrir se quem está a operar o sistema é um Super Administrador
         // Ajusta os campos 'role' ou 'roleProfessional' conforme vier guardado no objeto de user logado
         const userRole = parsed.user?.role || parsed.user?.roleProfessional;
@@ -97,8 +95,6 @@ export const professionalsService = {
       }
     }
 
-    const API_KEY = process.env.NEXT_PUBLIC_DNIRN_API_KEY || 'dnirn00.@gmail.com';
-
     const payload: CreateProfessionalDto = {
       ...data,
       idUnity: data.idUnity || userUnityId, // data.idUnity sobrepõe; cai para a sessão só se vier vazio
@@ -107,10 +103,6 @@ export const professionalsService = {
     // DEFINIÇÃO DINÂMICA DA ROTA: Se for super, aponta para /super, senão vai para a rota comum
     // Nota: A barra final é IMPORTANTE para a API (RESTful)
     const targetRoute = isSuperUser ? '/dnirn/professionals/super' : '/dnirn/professionals/';
-    
-    console.log(`[DNIRN Auth] Operador detetado como Super? ${isSuperUser}. Encaminhando para: ${targetRoute}`);
-    console.log(`[DNIRN Payload] Enviando para ${targetRoute}:`, JSON.stringify(payload, null, 2));
-    console.log(`[DNIRN Token] Bearer ${token ? token.substring(0, 20) + '...' : 'NENHUM'}`);
 
     // O interceptor do api já adiciona Authorization automaticamente via sessionStorage
     const response = await api.post(targetRoute, payload);

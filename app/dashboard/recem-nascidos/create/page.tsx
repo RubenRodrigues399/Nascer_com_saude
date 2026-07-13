@@ -329,11 +329,19 @@ interface PendingDraft {
 }
 
 const DRAFTS_KEY = 'dnirn_pending_child_registrations';
+// Estes rascunhos guardam dados pessoais (BI, telefones) em texto simples no
+// dispositivo. Para limitar a janela de exposição num posto de trabalho
+// partilhado, expiram e são apagados automaticamente ao fim de 48 horas.
+const DRAFT_TTL_MS = 48 * 60 * 60 * 1000;
 
 function loadDrafts(): PendingDraft[] {
   try {
     const raw = localStorage.getItem(DRAFTS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const drafts: PendingDraft[] = raw ? JSON.parse(raw) : [];
+    const now = Date.now();
+    const valid = drafts.filter(d => now - d.savedAt < DRAFT_TTL_MS);
+    if (valid.length !== drafts.length) saveDrafts(valid);
+    return valid;
   } catch {
     return [];
   }

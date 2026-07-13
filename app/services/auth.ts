@@ -1,13 +1,13 @@
 // Métodos de login, logout, refresh token
 import axios from 'axios';
-import { api } from './api';
+import { api, API_KEY } from './api';
 
 // Cliente público — sem interceptor de token, para rotas abertas (recovery, login)
 const publicApi = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://api-registro-civil-ixfv.onrender.com',
   headers: {
     'Content-Type': 'application/json',
-    'x-api-key': process.env.NEXT_PUBLIC_DNIRN_API_KEY || 'dnirn00.@gmail.com',
+    'x-api-key': API_KEY,
   },
 });
 
@@ -128,9 +128,7 @@ export const authService = {
    * Rota: POST /dnirn/auth/recover-password
    */
   recoverPassword: async (data: { phoneNumber: string; newPassword: string; token: string }): Promise<ApiResponse<void>> => {
-    console.log('[DEBUG] authService.recoverPassword - enviando payload:', data);
     const response = await publicApi.post('/dnirn/auth/recover-password', data);
-    console.log('[DEBUG] authService.recoverPassword - resposta:', response.data);
     return response.data;
   }
 };

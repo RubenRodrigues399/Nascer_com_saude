@@ -55,20 +55,15 @@ export default function RecoverPasswordPage() {
     try {
       const phone = formatPhone(phoneNumber);
       const payload = { phoneNumber: phone, type: 'RECOVER_PASSWORD' as const, code: otp.trim() };
-      console.log('[DEBUG] validateOTP payload enviado:', payload);
       const res = await authService.validateOTP(payload);
-      console.log('[DEBUG] validateOTP resposta completa:', res);
-      console.log('[DEBUG] validateOTP data:', res.data);
       if (res.success) {
         const token = res.data?.authorizedRecoverToken || '';
-        console.log('[DEBUG] Token extraído (authorizedRecoverToken):', token);
         setOtpToken(token);
         setStep('password');
       } else {
         setError(res.message || 'Código inválido ou expirado.');
       }
     } catch (err: any) {
-      console.error('[DEBUG] validateOTP erro completo:', err.response?.data || err);
       setError(err.response?.data?.message || 'Erro ao validar o código OTP.');
     } finally {
       setLoading(false);
@@ -85,16 +80,13 @@ export default function RecoverPasswordPage() {
     try {
       const phone = formatPhone(phoneNumber);
       const payload = { phoneNumber: phone, newPassword, token: otpToken };
-      console.log('[DEBUG] recoverPassword payload enviado:', payload);
       const res = await authService.recoverPassword(payload);
-      console.log('[DEBUG] recoverPassword resposta:', res);
       if (res.success) {
         setStep('done');
       } else {
         setError(res.message || 'Erro ao redefinir a palavra-passe.');
       }
     } catch (err: any) {
-      console.error('[DEBUG] recoverPassword erro completo:', err.response?.data || err);
       setError(err.response?.data?.message || 'Erro de comunicação com o servidor.');
     } finally {
       setLoading(false);
