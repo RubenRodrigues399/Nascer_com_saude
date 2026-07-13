@@ -10,6 +10,9 @@ import {
   validateBI, validateFullName, isFutureDate, isExpiredDate, getTodayStr,
   validateParentBirthDate, validateWitnessBirthDate, validatePassportNumber,
 } from '@/utils/validators';
+import { useAuth } from '@/context/AuthContext';
+import { canWriteRecemNascidos } from '@/lib/permissions';
+import { useRequireAccess } from '@/hooks/useRequireAccess';
 
 type DocType = 'BI' | 'PASSAPORT' | 'DNV';
 type LookupState = 'idle' | 'searching' | 'found' | 'not_found';
@@ -297,6 +300,8 @@ function WitnessFormSection({
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function CreateChildPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { blocked } = useRequireAccess(canWriteRecemNascidos(user?.roleProfessional));
 
   const [step, setStep] = useState(1);
   const [serverError, setServerError] = useState('');
@@ -553,6 +558,10 @@ export default function CreateChildPage() {
     setGestWeeks(''); setGestDays('0'); setPlaceOfBirth('HOSPITAL'); setProfessionalSupport(true);
     setSelectedUnityId(''); setChildErrors({});
   };
+
+  if (blocked) {
+    return <div className="p-8 text-center text-slate-400 text-sm animate-pulse">A verificar permissões...</div>;
+  }
 
   if (createdRecord) {
     const dnv = createdRecord.individual?.identificationDocument?.identificationNumber || 'N/D';

@@ -4,9 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { unityService } from '@/app/services/unidades';
 import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
+import { useAuth } from '@/context/AuthContext';
+import { canCreateUnidade } from '@/lib/permissions';
+import { useRequireAccess } from '@/hooks/useRequireAccess';
 
 export default function CreateUnidadePage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { blocked } = useRequireAccess(canCreateUnidade(user?.roleProfessional));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -125,9 +130,13 @@ export default function CreateUnidadePage() {
     }
   };
 
+  if (blocked) {
+    return <div className="p-8 text-center text-slate-400 text-sm animate-pulse">A verificar permissões...</div>;
+  }
+
   return (
     <div className="p-6 max-w-xl mx-auto space-y-4">
-      <button 
+      <button
         onClick={() => router.push('/dashboard/unidades')}
         className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider transition-colors"
       >

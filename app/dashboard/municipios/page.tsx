@@ -3,8 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { locationsService, Province, Municipality } from '@/app/services/locations';
 import { DetailsModal, DetailRow, AuditSection } from '@/components/DetailsModal';
+import { useAuth } from '@/context/AuthContext';
+import { canAccessGeografia } from '@/lib/permissions';
+import { useRequireAccess } from '@/hooks/useRequireAccess';
 
 export default function MunicipiosPage() {
+  const { user } = useAuth();
+  const { blocked } = useRequireAccess(canAccessGeografia(user?.roleProfessional));
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string>('');
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
@@ -146,6 +151,10 @@ export default function MunicipiosPage() {
       setDeleteLoading(false);
     }
   };
+
+  if (blocked) {
+    return <div className="p-8 text-center text-slate-400 text-sm animate-pulse">A verificar permissões...</div>;
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto p-2">

@@ -11,9 +11,13 @@ import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoo
 import { unityService, UnityRecord } from '@/app/services/unidades';
 import { validateFullName, isFutureDate, getTodayStr } from '@/utils/validators';
 import { AuditSection } from '@/components/DetailsModal';
+import { useAuth } from '@/context/AuthContext';
+import { canWriteRecemNascidos, canDelete, scopeUnityId } from '@/lib/permissions';
 
 // ─── Modal: Ver Detalhes ──────────────────────────────────────────────────────
 function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: () => void; onEdit: () => void }) {
+  const { user } = useAuth();
+  const canEditRecord = canWriteRecemNascidos(user?.roleProfessional);
   const id: string = record.id || record.code || 'N/D';
   const nomeCrianca = record.nomeCrianca || record.individual?.fullName || '—';
   const sexo = record.individual?.gender === 'MALE' ? 'Masculino' : 'Feminino';
@@ -104,8 +108,10 @@ function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: (
         <div className="p-4 border-t border-slate-100 flex gap-3 flex-shrink-0">
           <button onClick={onClose}
             className="flex-1 py-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50">Fechar</button>
-          <button onClick={onEdit}
-            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm">Editar Registo</button>
+          {canEditRecord && (
+            <button onClick={onEdit}
+              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm">Editar Registo</button>
+          )}
           <button
             onClick={async () => {
               await logAction('Reimpressão de PDF', `Segunda via para ID: ${id}`);
@@ -415,6 +421,9 @@ function ModalField({ label, value, className = '' }: { label: string; value: st
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function RecemNascidosPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const scopedUnityId = scopeUnityId(user?.roleProfessional, user?.unityId);
+  const canWrite = canWriteRecemNascidos(user?.roleProfessional);
 
   const [allRecords, setAllRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -460,6 +469,11 @@ export default function RecemNascidosPage() {
     }).catch(() => {});
   }, []);
 
+  // Administrador e Técnico ficam presos à sua própria unidade; só o Super navega entre todas
+  useEffect(() => {
+    if (scopedUnityId != null) setFilterUnityId(String(scopedUnityId));
+  }, [scopedUnityId]);
+
   // Filtra por unidade
   useEffect(() => {
     if (!filterUnityId) { loadAll(); return; }
@@ -480,7 +494,7 @@ export default function RecemNascidosPage() {
     setDnvResult(null);
     try {
       const res = await newbornService.getChildByDNV(dnv);
-      if (res.success && res.data) {
+      if (res.success && res.data && (scopedUnityId == null || res.data.unity?.id === scopedUnityId)) {
         setDnvResult(res.data);
       } else {
         setDnvError('Nenhuma criança encontrada com esse DNV.');
@@ -522,10 +536,12 @@ export default function RecemNascidosPage() {
           <h1 className="text-xl font-bold text-slate-800">Registo de Recém-nascidos</h1>
           <p className="text-sm text-slate-500">Consulte o histórico central ou emita novos assentos de nascimento.</p>
         </div>
-        <button onClick={() => router.push('/dashboard/recem-nascidos/create')}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm transition-colors shadow-sm whitespace-nowrap">
-          + Registar Nascimento
-        </button>
+        {canWrite && (
+          <button onClick={() => router.push('/dashboard/recem-nascidos/create')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm transition-colors shadow-sm whitespace-nowrap">
+            + Registar Nascimento
+          </button>
+        )}
       </div>
 
       {actionMsg && (
@@ -539,8 +555,9 @@ export default function RecemNascidosPage() {
             value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
             className="flex-1 min-w-48 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm text-slate-800" />
           <select value={filterUnityId} onChange={e => setFilterUnityId(e.target.value)}
-            className="px-4 py-2 border border-slate-300 bg-white rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none min-w-48">
-            <option value="">Todas as Unidades</option>
+            disabled={scopedUnityId != null}
+            className="px-4 py-2 border border-slate-300 bg-white disabled:bg-slate-100 disabled:text-slate-400 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none min-w-48">
+            {scopedUnityId == null && <option value="">Todas as Unidades</option>}
             {unities.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>
@@ -648,10 +665,14 @@ export default function RecemNascidosPage() {
                         <div className="flex justify-end gap-1.5">
                           <button onClick={() => setDetailRecord(record)}
                             className="text-slate-600 hover:text-slate-800 text-xs font-bold bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg">Ver</button>
-                          <button onClick={() => setEditRecord(record)}
-                            className="text-blue-600 hover:text-blue-800 text-xs font-bold bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg">Editar</button>
-                          <button onClick={() => setDeleteId(id)}
-                            className="text-rose-600 hover:text-rose-800 text-xs font-bold bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg">Apagar</button>
+                          {canWrite && (
+                            <button onClick={() => setEditRecord(record)}
+                              className="text-blue-600 hover:text-blue-800 text-xs font-bold bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg">Editar</button>
+                          )}
+                          {canDelete(user?.roleProfessional) && (
+                            <button onClick={() => setDeleteId(id)}
+                              className="text-rose-600 hover:text-rose-800 text-xs font-bold bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg">Apagar</button>
+                          )}
                         </div>
                       </td>
                     </tr>

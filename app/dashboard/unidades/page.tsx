@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { unityService, UnityRecord } from '@/app/services/unidades';
 import { locationsService, Province, Municipality, safeNeighborhoodName } from '@/app/services/locations';
 import { DetailsModal, DetailRow, AuditSection } from '@/components/DetailsModal';
+import { useAuth } from '@/context/AuthContext';
+import { canAccessUnidades, canCreateUnidade, canDelete, scopeUnityId } from '@/lib/permissions';
+import { useRequireAccess } from '@/hooks/useRequireAccess';
 
 type SearchMode = 'all' | 'nif' | 'id';
 
@@ -19,6 +22,9 @@ function locationPath(uni: UnityRecord) {
 
 export default function UnidadesListPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { blocked } = useRequireAccess(canAccessUnidades(user?.roleProfessional));
+  const scopedUnityId = scopeUnityId(user?.roleProfessional, user?.unityId);
 
   const [allUnidades, setAllUnidades] = useState<UnityRecord[]>([]);
   const [displayed, setDisplayed] = useState<UnityRecord[]>([]);
@@ -63,8 +69,9 @@ export default function UnidadesListPage() {
       setLoading(true);
       const res = await unityService.getAllUnities();
       if (res.success) {
-        setAllUnidades(res.data);
-        setDisplayed(res.data);
+        const list = scopedUnityId != null ? res.data.filter(u => u.id === scopedUnityId) : res.data;
+        setAllUnidades(list);
+        setDisplayed(list);
       }
     } catch {
       setError('Não foi possível carregar a lista de unidades.');
@@ -118,7 +125,7 @@ export default function UnidadesListPage() {
     try {
       if (searchMode === 'nif') {
         const res = await unityService.getUnityByNif(q);
-        if (res.success && res.data) {
+        if (res.success && res.data && (scopedUnityId == null || res.data.id === scopedUnityId)) {
           setDisplayed([res.data]);
         } else {
           setDisplayed([]);
@@ -128,7 +135,7 @@ export default function UnidadesListPage() {
         const id = parseInt(q, 10);
         if (isNaN(id)) { setSearchError('Introduza um ID numérico válido.'); return; }
         const res = await unityService.getUnityById(id);
-        if (res.success && res.data) {
+        if (res.success && res.data && (scopedUnityId == null || res.data.id === scopedUnityId)) {
           setDisplayed([res.data]);
         } else {
           setDisplayed([]);
@@ -211,6 +218,10 @@ export default function UnidadesListPage() {
     }
   };
 
+  if (blocked) {
+    return <div className="p-8 text-center text-slate-400 text-sm animate-pulse">A verificar permissões...</div>;
+  }
+
   if (error) return <div className="p-6 text-rose-500 text-sm font-semibold">{error}</div>;
 
   return (
@@ -222,12 +233,14 @@ export default function UnidadesListPage() {
           <h1 className="text-xl font-bold text-slate-800">Unidades Hospitalares</h1>
           <p className="text-sm text-slate-500">Gestão de maternidades e hospitais integrados na DNIRN.</p>
         </div>
-        <button
-          onClick={() => router.push('/dashboard/unidades/create')}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-all shadow-sm active:scale-95 whitespace-nowrap"
-        >
-          + Nova Unidade
-        </button>
+        {canCreateUnidade(user?.roleProfessional) && (
+          <button
+            onClick={() => router.push('/dashboard/unidades/create')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl text-sm transition-all shadow-sm active:scale-95 whitespace-nowrap"
+          >
+            + Nova Unidade
+          </button>
+        )}
       </div>
 
       {actionMessage && <div className="p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-xs rounded-lg font-bold">✓ {actionMessage}</div>}
@@ -237,7 +250,10 @@ export default function UnidadesListPage() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
         {/* Selector de modo */}
         <div className="flex gap-2 flex-wrap">
-          {([['all', 'Todas as Unidades'], ['nif', 'Pesquisar por NIF'], ['id', 'Pesquisar por ID']] as [SearchMode, string][]).map(([mode, label]) => (
+          {(scopedUnityId == null
+            ? ([['all', 'Todas as Unidades'], ['nif', 'Pesquisar por NIF'], ['id', 'Pesquisar por ID']] as [SearchMode, string][])
+            : ([['all', 'A Minha Unidade']] as [SearchMode, string][])
+          ).map(([mode, label]) => (
             <button
               key={mode}
               onClick={() => handleModeChange(mode)}
@@ -324,12 +340,14 @@ export default function UnidadesListPage() {
                       >
                         Editar
                       </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(uni.id)}
-                        className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
-                      >
-                        Apagar
-                      </button>
+                      {canDelete(user?.roleProfessional) && (
+                        <button
+                          onClick={() => setConfirmDeleteId(uni.id)}
+                          className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
+                        >
+                          Apagar
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

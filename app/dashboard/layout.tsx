@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
+import { canAccessGeografia, canAccessProfissionais, canAccessUnidades, canAccessConfiguracoes } from '@/lib/permissions';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, loading } = useAuth();
@@ -13,15 +14,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!loading && !user) router.push('/login');
   }, [user, loading, router]);
 
+  const role = user?.roleProfessional;
   const navItems = [
     { name: 'Painel principal', path: '/dashboard' },
-    { name: 'Províncias', path: '/dashboard/provincias' },
-    { name: 'Municípios', path: '/dashboard/municipios' },
-    { name: 'Bairros', path: '/dashboard/bairros' },
-    { name: 'Profissionais', path: '/dashboard/profissionais' },
-    { name: 'Unidades', path: '/dashboard/unidades' },
+    ...(canAccessGeografia(role) ? [
+      { name: 'Províncias', path: '/dashboard/provincias' },
+      { name: 'Municípios', path: '/dashboard/municipios' },
+      { name: 'Bairros', path: '/dashboard/bairros' },
+    ] : []),
+    ...(canAccessProfissionais(role) ? [{ name: 'Profissionais', path: '/dashboard/profissionais' }] : []),
+    ...(canAccessUnidades(role) ? [{ name: 'Unidades', path: '/dashboard/unidades' }] : []),
     { name: 'Cidadãos', path: '/dashboard/individuos' },
     { name: 'Recém-nascidos', path: '/dashboard/recem-nascidos' },
+    ...(canAccessConfiguracoes(role) ? [{ name: 'Configurações', path: '/dashboard/configuracoes' }] : []),
     { name: 'Conta', path: '/dashboard/conta' },
   ];
 

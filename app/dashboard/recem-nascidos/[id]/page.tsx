@@ -7,6 +7,8 @@ import { individualsService } from '@/app/services/individuos';
 import { locationsService, Province, Municipality, safeNeighborhoodName } from '@/app/services/locations';
 import { validateBI, validateFullName, getTodayStr, validateParentBirthDate, isExpiredDate, validatePassportNumber } from '@/utils/validators';
 import { AuditSection } from '@/components/DetailsModal';
+import { useAuth } from '@/context/AuthContext';
+import { canWriteRecemNascidos } from '@/lib/permissions';
 
 type LookupState = 'idle' | 'searching' | 'found' | 'not_found' | 'submitting' | 'done';
 
@@ -30,6 +32,8 @@ const emptyFatherForm: FatherForm = {
 export default function ChildDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const canWrite = canWriteRecemNascidos(user?.roleProfessional);
 
   const [child, setChild] = useState<ChildRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -283,6 +287,8 @@ export default function ChildDetailPage() {
           <div className="p-4 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-sm rounded-lg font-bold">
             Pai adicionado com sucesso ao registo.
           </div>
+        ) : !canWrite ? (
+          <p className="text-sm text-slate-500 italic">Nenhum pai registado neste assento.</p>
         ) : (
           <div className="space-y-5">
             <p className="text-sm text-slate-500 italic">Nenhum pai registado neste assento.</p>

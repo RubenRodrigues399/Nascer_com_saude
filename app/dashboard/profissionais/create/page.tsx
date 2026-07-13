@@ -7,6 +7,8 @@ import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoo
 import { unityService, UnityRecord } from '@/app/services/unidades';
 import { useAuth } from '@/context/AuthContext';
 import { validateFullName, isFutureDate, getAgeYears, getTodayStr } from '@/utils/validators';
+import { canCreateProfissional } from '@/lib/permissions';
+import { useRequireAccess } from '@/hooks/useRequireAccess';
 
 type Role = 'TECHNICAL' | 'ADMINISTRATIVE' | 'ADMINISTRATIVE_SUPER';
 type DocType = 'BI' | 'PASSAPORT' | 'DNV';
@@ -14,6 +16,7 @@ type DocType = 'BI' | 'PASSAPORT' | 'DNV';
 export default function CreateProfessionalPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { blocked } = useRequireAccess(canCreateProfissional(user?.roleProfessional));
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -202,6 +205,10 @@ export default function CreateProfessionalPage() {
     }
   };
 
+  if (blocked) {
+    return <div className="p-8 text-center text-slate-400 text-sm animate-pulse">A verificar permissões...</div>;
+  }
+
   return (
     <div className="p-6 max-w-xl mx-auto space-y-4">
       <button
@@ -322,7 +329,7 @@ export default function CreateProfessionalPage() {
             </div>
           </div>
 
-          {/* Unidade (apenas para não-super) */}
+          {/* Unidade (apenas para não-super) — um Administrador só regista na sua própria instituição */}
           {!isSuper && (
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1 tracking-wide">Unidade Hospitalar *</label>
@@ -330,11 +337,11 @@ export default function CreateProfessionalPage() {
                 required
                 value={selectedUnityId}
                 onChange={e => setSelectedUnityId(e.target.value)}
-                disabled={loading || unities.length === 0}
+                disabled={loading || unities.length === 0 || !canCreateSuper}
                 className="w-full p-2.5 border border-slate-300 bg-white disabled:bg-slate-100 rounded-xl text-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
               >
                 <option value="">{unities.length === 0 ? 'A carregar...' : '-- Escolha a Unidade --'}</option>
-                {unities.map(u => (
+                {(canCreateSuper ? unities : unities.filter(u => u.id === user?.unityId)).map(u => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>

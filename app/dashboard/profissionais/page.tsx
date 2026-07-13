@@ -4,6 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { professionalsService, ProfessionalRecord } from '@/app/services/profissionais';
 import { DetailsModal, DetailRow, AuditSection } from '@/components/DetailsModal';
+import { useAuth } from '@/context/AuthContext';
+import { canAccessProfissionais, canDelete, scopeUnityId } from '@/lib/permissions';
+import { useRequireAccess } from '@/hooks/useRequireAccess';
 
 type SearchMode = 'all' | 'phone' | 'id' | 'verify';
 
@@ -21,6 +24,9 @@ const roleBadge: Record<string, string> = {
 
 export default function ProfessionalsListPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { blocked } = useRequireAccess(canAccessProfissionais(user?.roleProfessional));
+  const scopedUnityId = scopeUnityId(user?.roleProfessional, user?.unityId);
 
   const [allProfessionals, setAllProfessionals] = useState<ProfessionalRecord[]>([]);
   const [displayed, setDisplayed] = useState<ProfessionalRecord[]>([]);
@@ -52,8 +58,9 @@ export default function ProfessionalsListPage() {
       setLoading(true);
       const res = await professionalsService.getAllProfessionals();
       if (res.success) {
-        setAllProfessionals(res.data);
-        setDisplayed(res.data);
+        const list = scopedUnityId != null ? res.data.filter(p => p.unity?.id === scopedUnityId) : res.data;
+        setAllProfessionals(list);
+        setDisplayed(list);
       }
     } catch {
       setError('Não foi possível carregar a lista de profissionais.');
@@ -122,6 +129,10 @@ export default function ProfessionalsListPage() {
       setDeleteLoading(false);
     }
   };
+
+  if (blocked) {
+    return <div className="p-8 text-center text-slate-400 text-sm animate-pulse">A verificar permissões...</div>;
+  }
 
   if (error) return <div className="p-6 text-rose-500 text-sm font-semibold">{error}</div>;
 
@@ -252,12 +263,14 @@ export default function ProfessionalsListPage() {
                       >
                         Detalhes
                       </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(pro.id)}
-                        className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
-                      >
-                        Apagar
-                      </button>
+                      {canDelete(user?.roleProfessional) && (
+                        <button
+                          onClick={() => setConfirmDeleteId(pro.id)}
+                          className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
+                        >
+                          Apagar
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

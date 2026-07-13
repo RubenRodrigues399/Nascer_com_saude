@@ -5,11 +5,12 @@ import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRouter } from 'next/navigation';
+import { canAccessConfiguracoes } from '@/lib/permissions';
 
 export default function ConfiguracoesPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  
+
   // Parâmetros de simulação de rede
   const [syncInterval, setSyncInterval] = useState('30');
   const [encryptionActive, setEncryptionActive] = useState(true);
@@ -21,12 +22,12 @@ export default function ConfiguracoesPage() {
   ) || [];
 
   useEffect(() => {
-    if (!loading && user && user.roleProfessional !== 'ADMINISTRATIVE_SUPER' && 'ADMINISTRATIVE') {
+    if (!loading && user && !canAccessConfiguracoes(user.roleProfessional)) {
       router.push('/dashboard');
     }
   }, [user, loading, router]);
 
-  if (loading || (user && user.roleProfessional !== 'ADMINISTRATIVE_SUPER' && 'ADMINISTRATIVE')) {
+  if (loading || (user && !canAccessConfiguracoes(user.roleProfessional))) {
     return (
       <div className="p-8 text-center text-slate-500 text-sm animate-pulse">
         A verificar permissões de segurança...

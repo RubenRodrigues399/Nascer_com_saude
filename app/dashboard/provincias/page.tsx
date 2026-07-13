@@ -5,9 +5,12 @@ import { locationsService, Province } from '@/app/services/locations';
 import { useAuth } from '@/context/AuthContext';
 import { logAction } from '@/utils/audit';
 import { DetailsModal, DetailRow, AuditSection } from '@/components/DetailsModal';
+import { canAccessGeografia } from '@/lib/permissions';
+import { useRequireAccess } from '@/hooks/useRequireAccess';
 
 export default function ProvinciasPage() {
   const { user } = useAuth();
+  const { blocked } = useRequireAccess(canAccessGeografia(user?.roleProfessional));
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState('');
@@ -120,6 +123,10 @@ export default function ProvinciasPage() {
       setDeleteLoading(false);
     }
   };
+
+  if (blocked) {
+    return <div className="p-8 text-center text-slate-400 text-sm animate-pulse">A verificar permissões...</div>;
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto p-2">
