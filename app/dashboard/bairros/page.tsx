@@ -2,17 +2,26 @@
 
 import React, { useState, useEffect } from 'react';
 import { locationsService, Province, Municipality, Neighborhood, safeNeighborhoodName } from '@/app/services/locations';
+import { DetailsModal, DetailRow, AuditSection } from '@/components/DetailsModal';
+
+type ViewMode = 'cascade' | 'all';
 
 export default function BairrosPage() {
+  const [viewMode, setViewMode] = useState<ViewMode>('cascade');
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
   const [bairros, setBairros] = useState<Neighborhood[]>([]);
+  const [allBairros, setAllBairros] = useState<Neighborhood[]>([]);
+  const [loadingAllBairros, setLoadingAllBairros] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string>('');
   const [selectedMunicipalityId, setSelectedMunicipalityId] = useState<string>('');
   const [loadingMuni, setLoadingMuni] = useState(false);
   const [loadingBairro, setLoadingBairro] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
+
+  // Detalhes / auditoria
+  const [detailsBairro, setDetailsBairro] = useState<Neighborhood | null>(null);
 
   // Modal de criação (tem cascata própria de província → município, independente dos filtros da página)
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -94,7 +103,11 @@ export default function BairrosPage() {
       const res = await locationsService.getBairrosByMunicipality(Number(id));
       if (res.success) {
         const data = res.data as any;
-        setBairros(Array.isArray(data) ? data : (data?.neighborhoods || data?.list || []));
+        const list: Neighborhood[] = Array.isArray(data) ? data : (data?.neighborhoods || data?.list || []);
+        // A API não devolve o município aninhado em cada bairro nesta rota — anexa-o
+        // aqui para que o modal de Detalhes possa mostrar a cadeia município/província.
+        const municipality = !Array.isArray(data) ? data?.municipality : undefined;
+        setBairros(municipality ? list.map((n) => ({ ...n, municipality: n.municipality || municipality })) : list);
       } else {
         setBairros([]);
       }
@@ -102,6 +115,32 @@ export default function BairrosPage() {
   };
 
   useEffect(() => { loadBairros(selectedMunicipalityId); }, [selectedMunicipalityId]);
+
+  const loadAllBairros = async () => {
+    setLoadingAllBairros(true);
+    try {
+      const res = await locationsService.getAllBairros();
+      setAllBairros(res.success ? res.data : []);
+    } catch {
+      setAllBairros([]);
+    } finally {
+      setLoadingAllBairros(false);
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode === 'all' && allBairros.length === 0) loadAllBairros();
+  }, [viewMode]);
+
+  /** Após criar/editar/apagar, actualiza a lista visível e invalida a cache de "Todos". */
+  const refreshAfterMutation = (muniId?: string) => {
+    if (viewMode === 'all') {
+      loadAllBairros();
+    } else {
+      loadBairros(muniId);
+      setAllBairros([]); // invalida a cache para a próxima vez que "Todos" for aberto
+    }
+  };
 
   // --- CRIAR ---
   const handleCreate = async (e: React.FormEvent) => {
@@ -117,9 +156,11 @@ export default function BairrosPage() {
       if (res.success) {
         setIsCreateOpen(false);
         setNewBairroName('');
+        setViewMode('cascade');
         setSelectedProvinceId(modalProvinceId);
         setSelectedMunicipalityId(modalMuniId);
         loadBairros(modalMuniId);
+        setAllBairros([]);
         flash('Bairro registado com sucesso.');
       } else {
         setCreateError(res.message || 'Erro ao registar.');
@@ -145,7 +186,7 @@ export default function BairrosPage() {
       const res = await locationsService.updateBairro(editingBairro.id, editBairroName.trim());
       if (res.success) {
         setEditingBairro(null);
-        loadBairros();
+        refreshAfterMutation();
         flash('Bairro actualizado com sucesso.');
       } else {
         flash(res.message || 'Erro ao actualizar.', true);
@@ -166,7 +207,7 @@ export default function BairrosPage() {
       const res = await locationsService.deleteBairro(confirmDeleteId);
       if (res.success) {
         setConfirmDeleteId(null);
-        loadBairros();
+        refreshAfterMutation();
         flash('Bairro eliminado.');
       } else {
         flash(res.message || 'Erro ao eliminar.', true);
@@ -197,31 +238,90 @@ export default function BairrosPage() {
         </button>
       </div>
 
-      {/* Filtros em cascata */}
-      <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Província</label>
-          <select value={selectedProvinceId} onChange={(e) => setSelectedProvinceId(e.target.value)}
-            className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none">
-            <option value="">-- Escolha uma Província --</option>
-            {provinces.map((prov) => <option key={prov.id} value={prov.id}>{prov.name}</option>)}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Município</label>
-          <select value={selectedMunicipalityId} disabled={!selectedProvinceId || loadingMuni}
-            onChange={(e) => setSelectedMunicipalityId(e.target.value)}
-            className="w-full px-4 py-2.5 border border-slate-300 bg-white disabled:bg-slate-50 disabled:text-slate-400 rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none">
-            <option value="">{loadingMuni ? 'A carregar...' : !selectedProvinceId ? 'Aguardando província...' : '-- Escolha um Município --'}</option>
-            {municipalities.map((muni) => <option key={muni.id} value={muni.id}>{muni.name}</option>)}
-          </select>
-        </div>
+      {/* Abas de modo de visualização */}
+      <div className="bg-white p-1.5 border border-slate-200 rounded-2xl shadow-sm inline-flex gap-1">
+        <button
+          onClick={() => setViewMode('cascade')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${viewMode === 'cascade' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+        >
+          Por Município
+        </button>
+        <button
+          onClick={() => setViewMode('all')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${viewMode === 'all' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+        >
+          Todos os Bairros
+        </button>
       </div>
+
+      {/* Filtros em cascata */}
+      {viewMode === 'cascade' && (
+        <div className="bg-white p-4 border border-slate-200 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Província</label>
+            <select value={selectedProvinceId} onChange={(e) => setSelectedProvinceId(e.target.value)}
+              className="w-full px-4 py-2.5 border border-slate-300 bg-white rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="">-- Escolha uma Província --</option>
+              {provinces.map((prov) => <option key={prov.id} value={prov.id}>{prov.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Município</label>
+            <select value={selectedMunicipalityId} disabled={!selectedProvinceId || loadingMuni}
+              onChange={(e) => setSelectedMunicipalityId(e.target.value)}
+              className="w-full px-4 py-2.5 border border-slate-300 bg-white disabled:bg-slate-50 disabled:text-slate-400 rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="">{loadingMuni ? 'A carregar...' : !selectedProvinceId ? 'Aguardando província...' : '-- Escolha um Município --'}</option>
+              {municipalities.map((muni) => <option key={muni.id} value={muni.id}>{muni.name}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
 
       {actionMessage && <div className="p-3 bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 text-xs rounded-lg font-bold">✓ {actionMessage}</div>}
       {actionError && <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold">{actionError}</div>}
 
-      {/* Tabela */}
+      {/* Tabela: modo "Todos os Bairros" */}
+      {viewMode === 'all' && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+          {loadingAllBairros ? (
+            <div className="p-12 text-center text-slate-400 text-sm animate-pulse">A carregar todos os bairros...</div>
+          ) : allBairros.length === 0 ? (
+            <div className="p-12 text-center text-slate-400 text-sm">Nenhum bairro activo no sistema.</div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">ID</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nome do Bairro</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Município</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Província</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Acções</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {allBairros.map((bairro) => (
+                  <tr key={bairro.id} className="hover:bg-slate-50/80 transition-all text-slate-700 text-sm">
+                    <td className="p-4 font-mono text-xs text-slate-400">{bairro.id}</td>
+                    <td className="p-4 font-semibold text-slate-800">{safeNeighborhoodName(bairro.name)}</td>
+                    <td className="p-4 text-slate-600">{bairro.municipality?.name || '—'}</td>
+                    <td className="p-4 text-slate-600">{bairro.municipality?.province?.name || '—'}</td>
+                    <td className="p-4">
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => setDetailsBairro(bairro)} className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors">Detalhes</button>
+                        <button onClick={() => openEdit(bairro)} className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors">Editar</button>
+                        <button onClick={() => setConfirmDeleteId(bairro.id)} className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors">Apagar</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Tabela: modo "Por Município" (cascata) */}
+      {viewMode === 'cascade' && (
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         {loadingBairro ? (
           <div className="p-12 text-center text-slate-400 text-sm animate-pulse">A mapear bairros...</div>
@@ -245,6 +345,7 @@ export default function BairrosPage() {
                   <td className="p-4 font-semibold text-slate-800">{safeNeighborhoodName(bairro.name)}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
+                      <button onClick={() => setDetailsBairro(bairro)} className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors">Detalhes</button>
                       <button onClick={() => openEdit(bairro)} className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors">Editar</button>
                       <button onClick={() => setConfirmDeleteId(bairro.id)} className="px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors">Apagar</button>
                     </div>
@@ -255,6 +356,7 @@ export default function BairrosPage() {
           </table>
         )}
       </div>
+      )}
 
       {/* MODAL DE CRIAÇÃO */}
       {isCreateOpen && (
@@ -343,6 +445,31 @@ export default function BairrosPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* DETALHES / AUDITORIA */}
+      {detailsBairro && (
+        <DetailsModal title="Detalhes do Bairro" onClose={() => setDetailsBairro(null)}>
+          <DetailRow label="ID" value={`#${detailsBairro.id}`} />
+          <DetailRow label="Nome" value={safeNeighborhoodName(detailsBairro.name)} />
+          <AuditSection creator={detailsBairro.creator} updater={detailsBairro.updater} />
+
+          {detailsBairro.municipality && (
+            <>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-4 mb-1">Município</p>
+              <DetailRow label="Nome" value={detailsBairro.municipality.name} />
+              <AuditSection creator={detailsBairro.municipality.creator} updater={detailsBairro.municipality.updater} />
+            </>
+          )}
+
+          {detailsBairro.municipality?.province && (
+            <>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-4 mb-1">Província</p>
+              <DetailRow label="Nome" value={detailsBairro.municipality.province.name} />
+              <AuditSection creator={detailsBairro.municipality.province.creator} updater={detailsBairro.municipality.province.updater} />
+            </>
+          )}
+        </DetailsModal>
       )}
     </div>
   );

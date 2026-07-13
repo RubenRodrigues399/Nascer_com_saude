@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { locationsService, Province } from '@/app/services/locations';
 import { useAuth } from '@/context/AuthContext';
 import { logAction } from '@/utils/audit';
+import { DetailsModal, DetailRow, AuditSection } from '@/components/DetailsModal';
 
 export default function ProvinciasPage() {
   const { user } = useAuth();
@@ -25,6 +26,9 @@ export default function ProvinciasPage() {
   // Confirmação de apagar
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Detalhes / auditoria
+  const [detailsProvince, setDetailsProvince] = useState<Province | null>(null);
 
   const loadProvinces = async () => {
     setLoading(true);
@@ -159,6 +163,12 @@ export default function ProvinciasPage() {
                   <td className="px-6 py-4">
                     <div className="flex justify-end gap-2">
                       <button
+                        onClick={() => setDetailsProvince(prov)}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors"
+                      >
+                        Detalhes
+                      </button>
+                      <button
                         onClick={() => openEdit(prov)}
                         className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
                       >
@@ -257,6 +267,15 @@ export default function ProvinciasPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* DETALHES / AUDITORIA */}
+      {detailsProvince && (
+        <DetailsModal title="Detalhes da Província" onClose={() => setDetailsProvince(null)}>
+          <DetailRow label="ID" value={`#${detailsProvince.id}`} />
+          <DetailRow label="Nome" value={detailsProvince.name} />
+          <AuditSection creator={detailsProvince.creator} updater={detailsProvince.updater} />
+        </DetailsModal>
       )}
     </div>
   );

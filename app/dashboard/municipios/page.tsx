@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { locationsService, Province, Municipality } from '@/app/services/locations';
+import { DetailsModal, DetailRow, AuditSection } from '@/components/DetailsModal';
 
 export default function MunicipiosPage() {
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -26,6 +27,9 @@ export default function MunicipiosPage() {
   // Confirmação de apagar
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Detalhes / auditoria
+  const [detailsMuni, setDetailsMuni] = useState<Municipality | null>(null);
 
   const flash = (msg: string, isError = false) => {
     isError ? setActionError(msg) : setActionMessage(msg);
@@ -200,6 +204,12 @@ export default function MunicipiosPage() {
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
                       <button
+                        onClick={() => setDetailsMuni(muni)}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors"
+                      >
+                        Detalhes
+                      </button>
+                      <button
                         onClick={() => openEdit(muni)}
                         className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
                       >
@@ -299,6 +309,15 @@ export default function MunicipiosPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* DETALHES / AUDITORIA */}
+      {detailsMuni && (
+        <DetailsModal title="Detalhes do Município" onClose={() => setDetailsMuni(null)}>
+          <DetailRow label="ID" value={`#${detailsMuni.id}`} />
+          <DetailRow label="Nome" value={detailsMuni.name} />
+          <AuditSection creator={detailsMuni.creator} updater={detailsMuni.updater} />
+        </DetailsModal>
       )}
     </div>
   );

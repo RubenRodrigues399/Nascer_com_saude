@@ -5,24 +5,50 @@ import { api } from './api';
 // ============================================================================
 // INTERFACES / TIPOS (Garante autocomplete perfeito para o teu grupo)
 // ============================================================================
+// Quem criou/actualizou o registo, conforme devolvido pelo Back-End em todos os
+// endpoints de Província/Município/Bairro.
+export interface AuditUser {
+  id: string;
+  name: string;
+}
+
 export interface Province {
   id?: number;
   name: string;
+  creator?: AuditUser;
+  updater?: AuditUser;
 }
 
 export interface Municipality {
   id?: number;
   name: string;
-  provinceId: number;
+  provinceId?: number;
+  deleted?: boolean;
+  creator?: AuditUser;
+  updater?: AuditUser;
+  // Presente quando o município vem aninhado (ex: dentro de um Bairro) ou
+  // devolvido individualmente por getMunicipalityById.
+  province?: Province;
 }
 
 export interface Neighborhood {
   id: number;
   name: string;
-  municipality?: {
-    id: number;
-    name: string;
-  };
+  creator?: AuditUser;
+  updater?: AuditUser;
+  municipality?: Municipality;
+}
+
+// Formato devolvido por /dnirn/municipalities/byProvinceId/{id}
+export interface MunicipalitiesByProvinceResponse {
+  province: Province;
+  municipalities: Municipality[];
+}
+
+// Formato devolvido por /dnirn/neighborhoods/byMunicipalityId/{id}
+export interface NeighborhoodsByMunicipalityResponse {
+  municipality: Municipality;
+  neighborhoods: Neighborhood[];
 }
 
 export interface CreateNeighborhoodDto {
@@ -110,7 +136,7 @@ export const locationsService = {
   },
 
   /** Listar todos os Municípios vinculados a uma determinada Província */
-  getMunicipalitiesByProvince: async (provinceId: number): Promise<ApiResponse<Municipality[]>> => {
+  getMunicipalitiesByProvince: async (provinceId: number): Promise<ApiResponse<MunicipalitiesByProvinceResponse>> => {
     const response = await api.get(`/dnirn/municipalities/byProvinceId/${provinceId}`);
     return response.data;
   },
@@ -142,7 +168,7 @@ export const locationsService = {
   },
 
   /** Listar todos os Bairros vinculados a um determinado Município */
-  getBairrosByMunicipality: async (municipalityId: number): Promise<ApiResponse<Neighborhood[]>> => {
+  getBairrosByMunicipality: async (municipalityId: number): Promise<ApiResponse<NeighborhoodsByMunicipalityResponse>> => {
     const response = await api.get(`/dnirn/neighborhoods/byMunicipalityId/${municipalityId}`);
     return response.data;
   },

@@ -47,7 +47,7 @@ export default function LocationSelector({ onLocationChange }: LocationSelectorP
     try {
       // Busca municípios filtrados pela Província de forma transparente
       const res = await locationsService.getMunicipalitiesByProvince(Number(provinceId));
-      if (res.success) setMunicipalities(res.data);
+      if (res.success) setMunicipalities(res.data.municipalities || []);
     } catch (err) {
       console.error('Erro ao carregar municípios:', err);
     } finally {
@@ -68,7 +68,7 @@ export default function LocationSelector({ onLocationChange }: LocationSelectorP
     try {
       // Busca bairros filtrados pelo Município
       const res = await locationsService.getBairrosByMunicipality(Number(municipalityId));
-      if (res.success) setNeighborhoods(res.data);
+      if (res.success) setNeighborhoods(res.data.neighborhoods || []);
     } catch (err) {
       console.error('Erro ao carregar bairros:', err);
     } finally {
