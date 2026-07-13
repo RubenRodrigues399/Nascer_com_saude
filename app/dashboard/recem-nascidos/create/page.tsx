@@ -318,13 +318,90 @@ function WitnessFormSection({
 }
 
 // ─── Página principal ─────────────────────────────────────────────────────────
+// Guarda o(s) payload(s) localmente quando o envio falha por falta de ligação
+// ao servidor, para não obrigar o operador a reescrever tudo se fechar a
+// página — e para suportar mais de um registo por enviar em simultâneo
+// (ex: duas tentativas falhadas em sessões diferentes antes de a rede voltar).
+interface PendingDraft {
+  id: string;
+  savedAt: number;
+  payload: CreateChildDto;
+}
+
+const DRAFTS_KEY = 'dnirn_pending_child_registrations';
+
+function loadDrafts(): PendingDraft[] {
+  try {
+    const raw = localStorage.getItem(DRAFTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDrafts(drafts: PendingDraft[]) {
+  try {
+    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+  } catch {
+    // localStorage indisponível (modo privado, quota esgotada, etc.) — sem rascunho, sem crash
+  }
+}
+
+type CreateAttemptResult =
+  | { ok: true; data: ChildRecord }
+  | { ok: false; networkError: true }
+  | { ok: false; networkError: false; message: string };
+
+async function attemptCreate(payload: CreateChildDto): Promise<CreateAttemptResult> {
+  try {
+    const res = await newbornService.createChild(payload);
+    if (res.success) return { ok: true, data: res.data };
+    return { ok: false, networkError: false, message: res.message || 'Erro ao comunicar com a API.' };
+  } catch (err: any) {
+    if (!err.response) return { ok: false, networkError: true };
+    const data = err.response?.data;
+    const detail =
+      (Array.isArray(data?.message) ? data.message.join(', ') : data?.message) ||
+      (Array.isArray(data?.errors) ? data.errors.join(', ') : data?.errors) ||
+      data?.error || err.message || 'Erro desconhecido';
+    return { ok: false, networkError: false, message: `Erro ${err.response?.status ?? ''}: ${detail}` };
+  }
+}
+
 export default function CreateChildPage() {
   const router = useRouter();
 
   const [step, setStep] = useState(1);
   const [serverError, setServerError] = useState('');
+  const [networkError, setNetworkError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [createdRecord, setCreatedRecord] = useState<ChildRecord | null>(null);
+
+  // Registos por enviar guardados localmente (pode haver mais do que um)
+  const [pendingDrafts, setPendingDrafts] = useState<PendingDraft[]>([]);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => { setPendingDrafts(loadDrafts()); }, []);
+
+  const addDraft = (payload: CreateChildDto): string => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setPendingDrafts(prev => {
+      const next = [...prev, { id, savedAt: Date.now(), payload }];
+      saveDrafts(next);
+      return next;
+    });
+    return id;
+  };
+
+  const removeDraftById = (id: string) => {
+    setPendingDrafts(prev => {
+      const next = prev.filter(d => d.id !== id);
+      saveDrafts(next);
+      return next;
+    });
+  };
 
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [unities, setUnities] = useState<UnityRecord[]>([]);
@@ -513,11 +590,39 @@ export default function CreateChildPage() {
   const updateWitness = (i: number, patch: Partial<WitnessFormData>) =>
     setWitnesses(w => w.map((item, idx) => idx === i ? { ...item, ...patch } : item));
 
-  // ── Submissão
-  const handleSubmit = async (e: React.BaseSyntheticEvent) => {
-    e.preventDefault();
+  // ── Submissão (partilhada entre o envio inicial e o "Tentar Novamente" no formulário)
+  const submitPayload = async (payload: CreateChildDto, draftId?: string) => {
     setLoading(true);
     setServerError('');
+    setNetworkError(false);
+
+    console.log('[CREATE CHILD] Payload enviado:', JSON.stringify(payload, null, 2));
+    const result = await attemptCreate(payload);
+
+    if (result.ok) {
+      console.log('[CREATE CHILD] Resposta da API:', result.data);
+      if (draftId) removeDraftById(draftId);
+      setCurrentDraftId(null);
+      setCreatedRecord(result.data);
+    } else if (result.networkError) {
+      // Sem resposta do servidor (rede em falha, servidor inacessível, etc.) — guarda o
+      // rascunho localmente para que o operador não perca os dados já preenchidos.
+      console.error('[CREATE CHILD] Falha de rede.');
+      const id = draftId ?? addDraft(payload);
+      setCurrentDraftId(id);
+      setNetworkError(true);
+      setServerError('Sem ligação ao servidor. Os dados foram guardados neste dispositivo — tente novamente quando a rede voltar.');
+      setStep(4);
+    } else {
+      console.warn('[CREATE CHILD] Recusado:', result.message);
+      setServerError(result.message);
+      setStep(4);
+    }
+    setLoading(false);
+  };
+
+  const handleSubmit = async (e: React.BaseSyntheticEvent) => {
+    e.preventDefault();
 
     const payload: CreateChildDto = {
       individualChild: {
@@ -538,35 +643,47 @@ export default function CreateChildPage() {
       witness: witnesses.map(w => ({ parent: toParentInput(w), gender: w.gender })),
     };
 
-    console.log('[CREATE CHILD] Payload enviado:', JSON.stringify(payload, null, 2));
+    setCurrentDraftId(null);
+    await submitPayload(payload);
+  };
 
-    try {
-      const res = await newbornService.createChild(payload);
-      if (res.success) {
-        console.log('[CREATE CHILD] Resposta da API:', res.data);
-        setCreatedRecord(res.data);
-      } else {
-        console.warn('[CREATE CHILD] API recusou:', res);
-        setServerError(res.message || 'Erro ao comunicar com a API.');
-        setStep(4);
-      }
-    } catch (err: any) {
-      console.error('[CREATE CHILD] Erro HTTP:', err.response?.status, err.response?.data);
-      const data = err.response?.data;
-      const detail =
-        (Array.isArray(data?.message) ? data.message.join(', ') : data?.message) ||
-        (Array.isArray(data?.errors) ? data.errors.join(', ') : data?.errors) ||
-        data?.error || err.message || 'Erro desconhecido';
-      setServerError(`Erro ${err.response?.status ?? ''}: ${detail}`);
-      setStep(4);
-    } finally {
-      setLoading(false);
+  const handleRetry = () => {
+    const draft = pendingDrafts.find(d => d.id === currentDraftId);
+    if (draft) submitPayload(draft.payload, draft.id);
+  };
+
+  // ── Recuperação de registos por enviar (ecrã de lista, fora do formulário principal)
+  const retryDraft = async (draft: PendingDraft) => {
+    setRetryingId(draft.id);
+    setDraftErrors(prev => {
+      const { [draft.id]: _removed, ...rest } = prev;
+      return rest;
+    });
+    const result = await attemptCreate(draft.payload);
+    if (result.ok) {
+      removeDraftById(draft.id);
+      setCreatedRecord(result.data);
+    } else if (result.networkError) {
+      setDraftErrors(prev => ({ ...prev, [draft.id]: 'Ainda sem ligação ao servidor. O registo continua guardado — tenta novamente mais tarde.' }));
+    } else {
+      setDraftErrors(prev => ({ ...prev, [draft.id]: result.message }));
     }
+    setRetryingId(null);
+  };
+
+  const discardDraft = (id: string) => {
+    removeDraftById(id);
+    setDraftErrors(prev => {
+      const { [id]: _removed, ...rest } = prev;
+      return rest;
+    });
   };
 
   const resetAll = () => {
     setStep(1);
     setServerError('');
+    setNetworkError(false);
+    setCurrentDraftId(null);
     setCreatedRecord(null);
     setMother(emptyParent()); setMotherErrors({}); setMotherLookupDoc(''); setMotherLookupState('idle');
     setIncludeFather(false); setFather(emptyParent()); setFatherErrors({}); setFatherLookupDoc(''); setFatherLookupState('idle');
@@ -607,6 +724,92 @@ export default function CreateChildPage() {
     );
   }
 
+  if (pendingDrafts.length > 0) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 p-2">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <button onClick={() => router.push('/dashboard/recem-nascidos')}
+            className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase mb-4 block">
+            ← Voltar à lista
+          </button>
+          <h1 className="text-xl font-black text-slate-800">
+            {pendingDrafts.length === 1 ? 'Registo Por Enviar Encontrado' : `${pendingDrafts.length} Registos Por Enviar Encontrados`}
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {pendingDrafts.length === 1
+              ? 'Uma tentativa anterior falhou por falta de ligação e ficou guardada neste dispositivo.'
+              : 'Estas tentativas anteriores falharam por falta de ligação e ficaram guardadas neste dispositivo.'}
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {pendingDrafts.map(draft => {
+            const p = draft.payload;
+            const isRetrying = retryingId === draft.id;
+            const draftError = draftErrors[draft.id];
+            return (
+              <div key={draft.id} className="bg-white p-5 rounded-xl border border-amber-200 shadow-sm space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">
+                      Guardado em {new Date(draft.savedAt).toLocaleString('pt-AO')}
+                    </p>
+                    <h2 className="text-base font-black text-slate-800">{p.individualChild.fullName}</h2>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">
+                    {p.individualChild.gender === 'MALE' ? 'Masculino' : 'Feminino'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="text-slate-400 font-bold uppercase text-[10px]">Nascimento</p>
+                    <p className="text-slate-700">{p.individualChild.birthDate.replace('T', ' ').slice(0, 16)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-bold uppercase text-[10px]">Peso / Altura</p>
+                    <p className="text-slate-700">{p.weight} kg · {p.height} cm</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-bold uppercase text-[10px]">Mãe</p>
+                    <p className="text-slate-700">{p.mother.fullName}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 font-bold uppercase text-[10px]">Pai</p>
+                    <p className="text-slate-700">{p.father?.fullName || 'Não declarado'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-slate-400 font-bold uppercase text-[10px]">Testemunhas</p>
+                    <p className="text-slate-700">{p.witness?.length || 0}</p>
+                  </div>
+                </div>
+
+                {draftError && (
+                  <div className="p-2.5 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold break-words">
+                    {draftError}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-1">
+                  <button type="button" disabled={isRetrying}
+                    onClick={() => discardDraft(draft.id)}
+                    className="w-1/2 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                    Descartar
+                  </button>
+                  <button type="button" disabled={isRetrying}
+                    onClick={() => retryDraft(draft)}
+                    className="w-1/2 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold rounded-xl text-xs">
+                    {isRetrying ? 'A Enviar...' : 'Tentar Enviar'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   const stepLabels = ['Mãe', 'Pai', 'Bebé', 'Confirmar'];
 
   return (
@@ -634,8 +837,14 @@ export default function CreateChildPage() {
       </div>
 
       {serverError && (
-        <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold break-words">
-          {serverError}
+        <div className="p-3 bg-rose-50 border-l-4 border-rose-500 text-rose-800 text-xs rounded-lg font-semibold break-words flex items-center justify-between gap-3">
+          <span>{serverError}</span>
+          {networkError && (
+            <button type="button" onClick={handleRetry} disabled={loading}
+              className="shrink-0 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white font-bold rounded-lg text-xs transition-colors">
+              {loading ? 'A tentar...' : 'Tentar Novamente'}
+            </button>
+          )}
         </div>
       )}
 

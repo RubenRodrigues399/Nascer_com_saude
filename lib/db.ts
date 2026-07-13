@@ -1,84 +1,18 @@
 import Dexie, { Table } from 'dexie';
 
-export interface Neighborhood {
-  id?: number;
-  name: string;
-  municipalityId: number; 
-  createdAt: number;
-}
-
-export interface Municipality {
-  id?: number;
-  name: string;
-  provinceId: number; 
-  createdAt: number;
-}
-
-export interface Province {
-  id?: number; 
-  name: string;
-  createdAt: number;
-}
-
-export interface Professional {
-  id?: string | number; // 
-  roleProfessional: 'ADMINISTRATIVE' | 'TECHNICAL' | 'ADMINISTRATIVE_SUPER';
-  individual: {
-    fullName: string;
-    gender: 'MALE' | 'FEMALE';
-    identificationDocument: {
-      typeDocument: 'BI' | 'PASSAPORT';
-      identificationNumber: string;
-      expirationDateDocument: string;
-    };
-    birthDate: string;
-    neighborhoodId: number; 
-    phoneNumber: string;
-  };
-  unityId: number; 
-  createdAt: number;
-}
-
-export interface Unity {
-  id?: number;
-  name: string;
-  nif: string;
-  phoneNumber: string;
-  email: string;
-  neighborhoodId: number;
-  createdAt: number;
-}
-
-export interface BirthRecord {
-  id?: string;
-  nomeMae: string;
-  biMae: string;
-  nomePai?: string;
-  biPai?: string;
-  nomeCrianca: string;
-  dataNascimento: string;
-  horaNascimento: string;
-  sexo: string;
-  naturalDe: string;
-  municipio: string;
-  provincia: string;
-  status: 'pendente' | 'sincronizado' | 'erro';
-  createdAt: number;
-}
-
+// As tabelas provinces/municipalities/neighborhoods/records/professionals/unities
+// pertenciam a um motor de sincronização offline nunca ligado a nenhum ecrã real
+// (o único componente que as escrevia, BirthForm.tsx, nunca chegou a ser usado).
+// Mantém-se aqui apenas `logs`, que é o trilho de auditoria local realmente usado
+// (ver utils/audit.ts e app/dashboard/configuracoes/page.tsx). O esquema da
+// versão 1 não é alterado para não invalidar bases de dados já criadas no
+// browser de utilizadores existentes.
 export class MyDatabase extends Dexie {
-  neighborhoods!: Table<Neighborhood>;
-  municipalities!: Table<Municipality>;
-  provinces!: Table<Province>;
-  records!: Table<BirthRecord>;
-  professionals!: Table<Professional>;
-  unities!: Table<Unity>;
   logs!: Table<any>;
 
   constructor() {
-    // Mudamos para v3. Isto força o browser a ignorar totalmente o passado corrompido
     super('DNIRN_Maternidade');
-    
+
     this.version(1).stores({
       provinces: '++id, name',
       municipalities: '++id, name, provinceId',

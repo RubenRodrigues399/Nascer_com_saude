@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/db';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { generateAssentoPDF } from '@/utils/pdfGenerator';
 import { logAction } from '@/utils/audit';
 import { newbornService, UpdateChildDto } from '@/app/services/recem-nascidos';
@@ -447,8 +445,6 @@ export default function RecemNascidosPage() {
   const [deleting, setDeleting] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
 
-  const localRecords = useLiveQuery(() => db.records.orderBy('createdAt').reverse().toArray()) || [];
-
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -517,10 +513,9 @@ export default function RecemNascidosPage() {
     finally { setDeleting(false); }
   };
 
-  const recordsToDisplay = allRecords.length > 0 ? allRecords : localRecords;
   const isLoading = loading || loadingFilter;
 
-  const filteredRecords = recordsToDisplay.filter(record => {
+  const filteredRecords = allRecords.filter(record => {
     const nomeBaby = record.nomeCrianca || record.individual?.fullName || '';
     const nomeMother = record.nomeMae || record.mother?.individual?.fullName || '';
     return nomeBaby.toLowerCase().includes(searchTerm.toLowerCase()) ||
