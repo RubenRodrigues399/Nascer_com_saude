@@ -31,6 +31,8 @@ function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: (
   const vivo = record.vitalStatus === 'ALIVE' || !record.vitalStatus;
   const gestacao = record.gestacionalAge ? `${record.gestacionalAge.weeks}s ${record.gestacionalAge.days}d` : '—';
   const unidade = record.unity?.name || '—';
+  const criadoEm = record.individual?.createdAt?.split('T')[0];
+  const actualizadoEm = record.individual?.updatedAt?.split('T')[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3"
@@ -86,6 +88,14 @@ function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: (
                     <span className="text-slate-800 font-semibold">{w.individual?.fullName || '—'}</span>
                   </div>
                 ))}
+              </div>
+            </ModalSection>
+          )}
+          {(criadoEm || actualizadoEm) && (
+            <ModalSection title="Metadados">
+              <div className="grid grid-cols-2 gap-3">
+                {criadoEm && <ModalField label="Criado em" value={criadoEm} />}
+                {actualizadoEm && <ModalField label="Actualizado em" value={actualizadoEm} />}
               </div>
             </ModalSection>
           )}

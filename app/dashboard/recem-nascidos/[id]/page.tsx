@@ -222,6 +222,8 @@ export default function ChildDetailPage() {
   const unityName = child?.unity?.name ?? 'N/D';
   const vitalLabel = child?.vitalStatus === 'ALIVE' ? 'Vivo' : 'Falecido';
   const hasFather = !!child?.father;
+  const criadoEm = child?.individual?.createdAt?.split('T')[0];
+  const actualizadoEm = child?.individual?.updatedAt?.split('T')[0];
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 p-2">
@@ -253,6 +255,8 @@ export default function ChildDetailPage() {
           <InfoField label="Idade Gestacional" value={child?.gestacionalAge ? `${child.gestacionalAge.weeks}s ${child.gestacionalAge.days}d` : 'N/D'} />
           <InfoField label="Unidade Hospitalar" value={unityName} />
           <InfoField label="Apoio Profissional" value={child?.professionalSupport ? 'Sim' : 'Não'} />
+          {criadoEm && <InfoField label="Criado em" value={criadoEm} />}
+          {actualizadoEm && <InfoField label="Actualizado em" value={actualizadoEm} />}
         </div>
         <AuditSection creator={child?.individual?.creator} updater={child?.individual?.updater} />
       </div>
