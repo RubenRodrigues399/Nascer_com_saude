@@ -159,6 +159,18 @@ DNV = "NCR-" || {ID da unidade} || "-" || {TS} || "-" || {SUB(0..6)}
 | POST | `/dnirn/auth/login` | Login do profissional |
 | POST | `/dnirn/auth/changePassword/{professionalId}` | Alterar palavra-passe |
 
+### 4.8 Unidades (Maternidades/Unidades Sanitárias)
+| Método | Rota | Descrição |
+|---|---|---|
+| POST | `/dnirn/unity` | Registar unidade |
+| PUT | `/dnirn/unity/{unityId}` | Actualizar unidade |
+| GET | `/dnirn/unity/all` | Listar unidades |
+| GET | `/dnirn/unity/getById/{id}` | Obter unidade por ID |
+| GET | `/dnirn/unity/getByNif/{nif}` | Obter unidade por NIF |
+| DELETE | `/dnirn/unity/{id}` | Apagar unidade |
+
+> **Nota:** este módulo usa **PUT** (não PATCH) para actualização — inconsistência real da API em relação aos outros módulos, mantida fielmente na documentação.
+
 > **Nota:** não foram fornecidas as rotas de **Unidades** (mencionadas no índice do Swagger como secção "Unidades", mas sem endpoints listados) nem os **Schemas** completos (modelos de request/response). Estes já são consumidos parcialmente pelo frontend (`services/unidades.ts`), mas os endpoints exatos e os schemas formais do OpenAPI ainda não foram colados aqui.
 
 ---
