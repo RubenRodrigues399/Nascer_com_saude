@@ -306,7 +306,6 @@ export default function CreateProfessionalPage() {
                 >
                   <option value="BI">BI</option>
                   <option value="PASSAPORT">Passaporte</option>
-                  <option value="DNV">DNV</option>
                 </select>
               </div>
               <div>
