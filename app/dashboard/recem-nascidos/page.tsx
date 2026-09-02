@@ -112,7 +112,7 @@ function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: (
           )}
           <button
             onClick={async () => {
-              await logAction('Reimpressão de PDF', `Segunda via para ID: ${id}`);
+              await logAction('Reimpressão de PDF', `Segunda via para ID: ${docNum}`);
               generateAssentoPDF({ id, dnv: docNum, nomeCrianca, dataNascimento: dataNasc, horaNascimento: horaNasc,
                 sexo: record.individual?.gender === 'MALE' ? 'M' : 'F',
                 nomeMae, biMae: docMae, nomePai: nomePai || 'Não Declarado', naturalDe: local, municipio: '', provincia: '' });
