@@ -251,7 +251,7 @@ export default function UnidadesListPage() {
         {/* Selector de modo */}
         <div className="flex gap-2 flex-wrap">
           {(scopedUnityId == null
-            ? ([['all', 'Todas as Unidades'], ['nif', 'Pesquisar por NIF'], ['id', 'Pesquisar por ID']] as [SearchMode, string][])
+            ? ([['all', 'Todas as Unidades'], ['nif', 'Pesquisar por NIF']] as [SearchMode, string][])
             : ([['all', 'A Minha Unidade']] as [SearchMode, string][])
           ).map(([mode, label]) => (
             <button

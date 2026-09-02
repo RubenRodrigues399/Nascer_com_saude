@@ -139,7 +139,6 @@ export default function ProfessionalsListPage() {
   const searchModes: [SearchMode, string][] = [
     ['all', 'Todos os Profissionais'],
     ['phone', 'Pesquisar por Telemóvel'],
-    ['id', 'Pesquisar por ID'],
   ];
 
   return (
