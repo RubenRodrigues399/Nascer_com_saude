@@ -35,6 +35,8 @@ function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: (
   const unidade = record.unity?.name || '—';
   const criadoEm = record.individual?.createdAt?.split('T')[0];
   const actualizadoEm = record.individual?.updatedAt?.split('T')[0];
+  const municipio = record.individual?.neighborhood?.municipality?.name || '—';
+  const provincia = record.individual?.neighborhood?.municipality?.province?.name || '—';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3"
@@ -115,7 +117,7 @@ function ChildDetailModal({ record, onClose, onEdit }: { record: any; onClose: (
               await logAction('Reimpressão de PDF', `Segunda via para ID: ${docNum}`);
               generateAssentoPDF({ id, dnv: docNum, nomeCrianca, dataNascimento: dataNasc, horaNascimento: horaNasc,
                 sexo: record.individual?.gender === 'MALE' ? 'M' : 'F',
-                nomeMae, biMae: docMae, nomePai: nomePai || 'Não Declarado', naturalDe: local, municipio: '', provincia: '' });
+                nomeMae, biMae: docMae, nomePai: nomePai || 'Não Declarado', naturalDe: local, municipio: municipio, provincia: provincia});
             }}
             className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-sm">Imprimir</button>
         </div>

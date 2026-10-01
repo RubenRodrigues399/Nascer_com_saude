@@ -66,6 +66,11 @@ export function generateAssentoPDF(data: PDFData): void {
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
   doc.text(data.nomeCrianca.toUpperCase(), colEsquerda + 30, y);
 
+  doc.setFont('helvetica', 'bold');
+  doc.text('Data de Nascimento:', colDireita, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${data.dataNascimento} às ${data.horaNascimento}h`, colDireita + 35, y);
+
   y += 7;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
   doc.text('Gênero:', colEsquerda, y);
@@ -73,10 +78,10 @@ export function generateAssentoPDF(data: PDFData): void {
   doc.text(data.sexo === 'M' || data.sexo === 'Masculino' ? 'Masculino' : 'Feminino', colEsquerda + 25, y);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Data de Nascimento.:', colDireita, y);
+  doc.text('Município:', colDireita, y);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${data.dataNascimento} às ${data.horaNascimento}h`, colDireita + 20, y);
-
+  doc.text(data.municipio || '—', colDireita + 27, y);
+  
   y += 7;
   doc.setFont('helvetica', 'bold');
   doc.text('Naturalidade:', colEsquerda, y);
@@ -84,10 +89,9 @@ export function generateAssentoPDF(data: PDFData): void {
   doc.text(data.naturalDe || '—', colEsquerda + 25, y);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Município/Prov.:', colDireita, y);
+  doc.text('Província:', colDireita, y);
   doc.setFont('helvetica', 'normal');
-  const locGeo = [data.municipio, data.provincia].filter(Boolean).join(' / ') || '—';
-  doc.text(locGeo, colDireita + 27, y);
+  doc.text(data.provincia || '—', colDireita + 27, y);
 
   // Filiação (Pais)
   y += 14;
