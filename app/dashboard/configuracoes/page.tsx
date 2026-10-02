@@ -79,7 +79,7 @@ export default function ConfiguracoesPage() {
           </div>
 
           <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-xs text-amber-800 space-y-1">
-            <p className="font-bold">▲ Atenção ao Operador</p>
+            <p className="font-bold">Atenção ao Operador</p>
             <p>Estas configurações afetam diretamente o consumo de hardware do posto informático local da maternidade.</p>
           </div>
         </div>
